@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy Kids Playschool</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+    <style>
+        .hero-section {
+            background-color: #FFE5E5;
+            padding: 100px 0;
+        }
+        .feature-card {
+            border-radius: 15px;
+            transition: transform 0.3s;
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+        .activity-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        .navbar-brand {
+            font-size: 1.8rem;
+            color: #FF6B6B !important;
+        }
+        .testimonial-card {
+            background-color: #F8F9FA;
+            border-radius: 15px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="#"><i class="fas fa-school me-2"></i>Happy Kids</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="#home">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#about">About</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#programs">Programs</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#contact">Contact</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section" id="home">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-6">
+                    <h1 class="display-4 fw-bold mb-4">Welcome to Happy Kids Playschool</h1>
+                    <p class="lead mb-4">Where learning meets fun! We provide a safe and nurturing environment for your child to grow, learn, and play.</p>
+                    <button class="btn btn-primary btn-lg">Enroll Now</button>
+                </div>
+                <div class="col-lg-6">
+                    <img src="/api/placeholder/600/400" alt="Happy kids playing" class="img-fluid rounded shadow">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="py-5" id="about">
+        <div class="container">
+            <h2 class="text-center mb-5">Why Choose Us?</h2>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card feature-card h-100 shadow-sm">
+                        <div class="card-body text-center">
+                            <i class="fas fa-heart activity-icon text-danger"></i>
+                            <h5 class="card-title">Loving Environment</h5>
+                            <p class="card-text">Our caring staff creates a warm and nurturing atmosphere for every child.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card feature-card h-100 shadow-sm">
+                        <div class="card-body text-center">
+                            <i class="fas fa-book activity-icon text-primary"></i>
+                            <h5 class="card-title">Learning Through Play</h5>
+                            <p class="card-text">We believe in making learning fun and engaging for young minds.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card feature-card h-100 shadow-sm">
+                        <div class="card-body text-center">
+                            <i class="fas fa-shield-alt activity-icon text-success"></i>
+                            <h5 class="card-title">Safe & Secure</h5>
+                            <p class="card-text">Your child's safety is our top priority with monitored facilities.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Programs Section -->
+    <section class="py-5 bg-light" id="programs">
+        <div class="container">
+            <h2 class="text-center mb-5">Our Programs</h2>
+            <div class="row g-4">
+                <div class="col-md-6 col-lg-3">
+                    <div class="card h-100 shadow-sm">
+                        <img src="/api/placeholder/400/300" class="card-img-top" alt="Toddler program">
+                        <div class="card-body">
+                            <h5 class="card-title">Toddlers (1-2 years)</h5>
+                            <p class="card-text">Early development activities focused on motor skills and social interaction.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="card h-100 shadow-sm">
+                        <img src="/api/placeholder/400/300" class="card-img-top" alt="Preschool program">
+                        <div class="card-body">
+                            <h5 class="card-title">Preschool (2-3 years)</h5>
+                            <p class="card-text">Structured learning through play, arts, and group activities.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="card h-100 shadow-sm">
+                        <img src="/api/placeholder/400/300" class="card-img-top" alt="Pre-K program">
+                        <div class="card-body">
+                            <h5 class="card-title">Pre-K (3-4 years)</h5>
+                            <p class="card-text">Preparation for kindergarten with focus on basic academics.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="card h-100 shadow-sm">
+                        <img src="/api/placeholder/400/300" class="card-img-top" alt="After school program">
+                        <div class="card-body">
+                            <h5 class="card-title">After School (4-5 years)</h5>
+                            <p class="card-text">Extended care with homework help and supervised activities.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section class="py-5" id="contact">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-6 mx-auto">
+                    <h2 class="text-center mb-4">Contact Us</h2>
+                    <form>
+                        <div class="mb-3">
+                            <input type="text" class="form-control" placeholder="Your Name">
+                        </div>
+                        <div class="mb-3">
+                            <input type="email" class="form-control" placeholder="Email Address">
+                        </div>
+                        <div class="mb-3">
+                            <textarea class="form-control" rows="4" placeholder="Message"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Send Message</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light py-4">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4">
+                    <h5>Happy Kids Playschool</h5>
+                    <p>Nurturing young minds since 2010</p>
+                </div>
+                <div class="col-md-4">
+                    <h5>Contact Info</h5>
+                    <p>
+                        <i class="fas fa-map-marker-alt me-2"></i>123 Education Street<br>
+                        <i class="fas fa-phone me-2"></i>(555) 123-4567<br>
+                        <i class="fas fa-envelope me-2"></i>info@happykids.com
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <h5>Follow Us</h5>
+                    <div class="social-icons">
+                        <a href="#" class="text-light me-3"><i class="fab fa-facebook"></i></a>
+                        <a href="#" class="text-light me-3"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="text-light me-3"><i class="fab fa-twitter"></i></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
