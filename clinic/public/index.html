@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book an Appointment</title>
+  <link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/vendor/fontawesome/css/all.min.css" rel="stylesheet">
+  <link href="/css/styles.css" rel="stylesheet">
+</head>
+<body>
+  <nav class="navbar navbar-expand-md bg-white border-bottom sticky-top">
+    <div class="container">
+      <a class="navbar-brand fw-semibold text-brand" href="#"><i class="fa-solid fa-leaf me-2"></i><span data-clinic-name>Clinic</span></a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
+      <div class="collapse navbar-collapse" id="nav">
+        <ul class="navbar-nav ms-auto align-items-md-center gap-md-2">
+          <li class="nav-item"><a class="nav-link" href="#doctors">Our Doctors</a></li>
+          <li class="nav-item"><a class="nav-link" href="#services">Services</a></li>
+          <li class="nav-item"><a class="nav-link" href="#manage">My Booking</a></li>
+          <li class="nav-item"><a class="btn btn-brand btn-sm px-3" href="#book">Book Appointment</a></li>
+          <li class="nav-item"><a class="nav-link small text-muted" href="/staff"><i class="fa-solid fa-lock me-1"></i>Staff</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="container">
+      <div class="row align-items-center g-4">
+        <div class="col-lg-7">
+          <h1 class="display-5 mb-3" data-clinic-name>Clinic</h1>
+          <p class="lead text-secondary mb-4" id="tagline"></p>
+          <a href="#book" class="btn btn-brand btn-lg px-4 me-2"><i class="fa-regular fa-calendar-check me-2"></i>Book an appointment</a>
+          <a href="#manage" class="btn btn-outline-brand btn-lg px-4">Manage booking</a>
+          <p class="small text-secondary mt-4 mb-0"><i class="fa-solid fa-shield-heart me-1 text-brand"></i>
+            Your information is kept strictly confidential.</p>
+        </div>
+        <div class="col-lg-5">
+          <div class="card p-4">
+            <h2 class="h6 text-uppercase text-muted mb-3">Contact</h2>
+            <ul class="list-unstyled mb-0" id="contact"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section id="doctors" class="py-5">
+    <div class="container">
+      <h2 class="h3 mb-4">Our Psychiatrists</h2>
+      <div class="row g-4" id="doctor-list"></div>
+    </div>
+  </section>
+
+  <section id="services" class="py-5 bg-white">
+    <div class="container">
+      <h2 class="h3 mb-4">Services</h2>
+      <div class="row g-4" id="service-list"></div>
+    </div>
+  </section>
+
+  <section id="book" class="py-5">
+    <div class="container" style="max-width: 900px;">
+      <h2 class="h3 mb-1">Book an Appointment</h2>
+      <p class="text-secondary mb-4">It takes less than a minute.</p>
+      <div class="steps" id="steps"></div>
+      <div class="card p-4" id="wizard"></div>
+    </div>
+  </section>
+
+  <section id="manage" class="py-5 bg-white">
+    <div class="container" style="max-width: 640px;">
+      <h2 class="h3 mb-1">Manage My Booking</h2>
+      <p class="text-secondary">Enter your booking reference and phone number to check or cancel your appointment.</p>
+      <form id="lookup-form" class="row g-2">
+        <div class="col-sm-5"><input class="form-control" name="reference" placeholder="Reference (e.g. K7P2QX)" required></div>
+        <div class="col-sm-4"><input class="form-control" name="phone" type="tel" placeholder="Phone number" required></div>
+        <div class="col-sm-3 d-grid"><button class="btn btn-outline-brand">Find</button></div>
+      </form>
+      <div id="lookup-result" class="mt-3"></div>
+    </div>
+  </section>
+
+  <footer class="py-4 border-top">
+    <div class="container small text-secondary d-flex flex-wrap justify-content-between gap-2">
+      <span>&copy; <span id="year"></span> <span data-clinic-name>Clinic</span></span>
+      <span><i class="fa-solid fa-triangle-exclamation me-1"></i>In a mental health emergency, please call your local emergency number or go to the nearest hospital.</span>
+    </div>
+  </footer>
+
+  <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/book.js"></script>
+</body>
+</html>

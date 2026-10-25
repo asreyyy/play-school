@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clinic Staff</title>
+  <link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/vendor/fontawesome/css/all.min.css" rel="stylesheet">
+  <link href="/css/styles.css" rel="stylesheet">
+</head>
+<body>
+  <!-- Login -->
+  <div id="login-view" class="login-wrap d-none">
+    <div class="card p-4 p-md-5" style="width: 100%; max-width: 420px;">
+      <div class="text-center mb-4">
+        <span class="doctor-avatar mb-2"><i class="fa-solid fa-leaf"></i></span>
+        <h1 class="h4 mb-0" data-clinic-name>Clinic</h1>
+        <div class="text-muted small">Staff sign in</div>
+      </div>
+      <form id="login-form">
+        <div class="mb-3"><label class="form-label">Email</label><input name="email" type="email" class="form-control" required autocomplete="username" autofocus></div>
+        <div class="mb-3"><label class="form-label">Password</label><input name="password" type="password" class="form-control" required autocomplete="current-password"></div>
+        <div id="login-error"></div>
+        <button class="btn btn-brand w-100">Sign in</button>
+      </form>
+      <a href="/" class="small text-center d-block mt-3 text-secondary">← Patient booking site</a>
+    </div>
+  </div>
+
+  <!-- App shell -->
+  <div id="app-view" class="d-none">
+    <div class="d-flex staff-shell">
+      <aside class="sidebar d-flex flex-column" id="sidebar">
+        <div class="brand"><i class="fa-solid fa-leaf me-2"></i><span data-clinic-name>Clinic</span></div>
+        <nav class="nav flex-column" id="nav"></nav>
+        <div class="mt-auto p-3 small border-top border-secondary-subtle">
+          <div class="text-white" id="me-name"></div>
+          <div class="opacity-75 text-capitalize" id="me-role"></div>
+          <div class="mt-2 d-flex gap-3">
+            <a href="#/account" class="link-light">Account</a>
+            <a href="#" class="link-light" id="logout">Sign out</a>
+          </div>
+        </div>
+      </aside>
+      <main class="flex-grow-1 min-w-0">
+        <div class="d-lg-none bg-white border-bottom p-2 d-flex align-items-center gap-2">
+          <button class="btn btn-light" id="menu-toggle"><i class="fa-solid fa-bars"></i></button>
+          <span class="fw-semibold" data-clinic-name>Clinic</span>
+        </div>
+        <div class="container-fluid p-3 p-md-4" id="view"></div>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal fade" id="modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"></div></div>
+  </div>
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toasts"></div>
+
+  <script src="/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/staff.js"></script>
+</body>
+</html>
