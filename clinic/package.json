@@ -1,0 +1,20 @@
+{
+  "name": "clinic-manager",
+  "version": "1.0.0",
+  "description": "Appointment booking and management app for a small psychiatry clinic",
+  "private": true,
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch src/server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^6.7.2",
+    "bootstrap": "^5.3.3",
+    "express": "^5.1.0"
+  }
+}
