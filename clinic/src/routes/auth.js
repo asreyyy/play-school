@@ -47,7 +47,9 @@ module.exports = function authRoutes(db) {
     if (next.length < 8) throw bad('New password must be at least 8 characters.');
     const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
     if (!verifyPassword(current, row.password_hash)) throw bad('Current password is incorrect.');
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(next), req.user.id);
+    if (next === current) throw bad('Please choose a different password.');
+    db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?')
+      .run(hashPassword(next), req.user.id);
     res.json({ ok: true });
   });
 

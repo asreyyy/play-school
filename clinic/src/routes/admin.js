@@ -50,7 +50,7 @@ module.exports = function adminRoutes(db) {
     emailTaken(loginEmail);
     const id = tx(db, () => {
       const userId = insertRow(db, 'users', {
-        name, email: loginEmail, password_hash: hashPassword(pw), role: 'doctor',
+        name, email: loginEmail, password_hash: hashPassword(pw), role: 'doctor', must_change_password: 1,
       });
       return insertRow(db, 'doctors', {
         user_id: userId,
@@ -86,7 +86,10 @@ module.exports = function adminRoutes(db) {
           userFields.email = email(b.email, 'Email', { optional: false });
           emailTaken(userFields.email, doctor.user_id);
         }
-        if (b.password) userFields.password_hash = hashPassword(password(b.password));
+        if (b.password) {
+          userFields.password_hash = hashPassword(password(b.password));
+          userFields.must_change_password = 1;
+        }
         if (Object.keys(userFields).length) {
           const { sql, values } = updateSet(userFields);
           db.prepare(`UPDATE users SET ${sql} WHERE id = ?`).run(...values, doctor.user_id);
@@ -222,6 +225,7 @@ module.exports = function adminRoutes(db) {
     emailTaken(loginEmail);
     const id = insertRow(db, 'users', {
       name: required(b.name, 'Name', 120), email: loginEmail, password_hash: hashPassword(password(b.password)), role,
+      must_change_password: 1,
     });
     res.status(201).json({
       user: db.prepare(`SELECT ${USER_COLS} FROM users u LEFT JOIN doctors d ON d.user_id = u.id WHERE u.id = ?`).get(id),
@@ -244,7 +248,10 @@ module.exports = function adminRoutes(db) {
       f.role = oneOf(b.role, 'Role', ['admin', 'receptionist']);
     }
     if (b.active !== undefined) f.active = bool(b.active);
-    if (b.password) f.password_hash = hashPassword(password(b.password));
+    if (b.password) {
+      f.password_hash = hashPassword(password(b.password));
+      f.must_change_password = id === req.user.id ? 0 : 1;
+    }
 
     const losingAdmin = user.role === 'admin' && (f.active === 0 || (f.role && f.role !== 'admin'));
     if (losingAdmin) {

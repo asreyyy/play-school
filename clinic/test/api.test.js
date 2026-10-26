@@ -7,12 +7,16 @@ const assert = require('node:assert/strict');
 const { openDb } = require('../src/db');
 const { createApp } = require('../src/server');
 const { localDate, addDays, weekdayOf } = require('../src/slots');
+const { verifyPassword } = require('../src/auth');
 
 let server;
 let base;
 
 before(async () => {
-  const app = createApp(openDb(':memory:'));
+  const db = openDb(':memory:');
+  // Seeded accounts start with temporary passwords; most tests skip that step (covered separately below).
+  db.exec("UPDATE users SET must_change_password = 0");
+  const app = createApp(db);
   await new Promise((resolve) => { server = app.listen(0, resolve); });
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -60,7 +64,9 @@ test('patient books online, slot disappears, double booking rejected', async () 
   const slots = await c('GET', `/api/public/slots?doctor_id=1&service_id=2&date=${date}`);
   assert.ok(slots.body.slots.includes('10:00'));
 
-  const booking = { doctor_id: 1, service_id: 2, date, time: '10:00', name: 'Asha Rao', phone: '98765 43210' };
+  const booking = { doctor_id: 1, service_id: 2, date, time: '10:00', name: 'Asha Rao', phone: '98765 43210', consent: true };
+  const noConsent = await c('POST', '/api/public/book', { ...booking, consent: false });
+  assert.equal(noConsent.status, 400);
   const r = await c('POST', '/api/public/book', booking);
   assert.equal(r.status, 201, JSON.stringify(r.body));
   assert.equal(r.body.appointment.status, 'pending');
@@ -85,7 +91,7 @@ test('online booking rejects off-hours and Sunday times', async () => {
   const c = client();
   const date = nextWeekday();
   const r = await c('POST', '/api/public/book',
-    { doctor_id: 1, service_id: 2, date, time: '13:00', name: 'X', phone: '9111111111' });
+    { doctor_id: 1, service_id: 2, date, time: '13:00', name: 'X', phone: '9111111111', consent: true });
   assert.equal(r.status, 409);
   let sunday = addDays(localDate(), 1);
   while (weekdayOf(sunday) !== 0) sunday = addDays(sunday, 1);
@@ -191,6 +197,8 @@ test('doctor sees only own appointments; notes are private', async () => {
   const reception = client();
   await admin('POST', '/api/users', { name: 'Front Desk', email: 'desk@clinic.local', role: 'receptionist', password: 'password123' });
   await reception('POST', '/api/auth/login', { email: 'desk@clinic.local', password: 'password123' });
+  assert.equal((await reception('GET', `/api/patients/${pid}`)).status, 403); // temporary password
+  await reception('POST', '/api/auth/change-password', { current_password: 'password123', new_password: 'desk-password-2' });
   assert.equal((await reception('GET', `/api/patients/${pid}`)).status, 200);
   assert.equal((await reception('GET', `/api/patients/${pid}/notes`)).status, 403);
 
@@ -210,4 +218,72 @@ test('last admin cannot be deactivated; password change works', async () => {
   assert.equal((await admin('POST', '/api/auth/change-password', { current_password: 'admin123', new_password: 'short' })).status, 400);
   assert.equal((await admin('POST', '/api/auth/change-password', { current_password: 'admin123', new_password: 'newpassword1' })).status, 200);
   await login('admin@clinic.local', 'newpassword1');
+});
+
+test('health check and admin backup download', async () => {
+  const health = await fetch(`${base}/healthz`);
+  assert.equal(health.status, 200);
+  assert.equal((await client()('GET', '/api/backup')).status, 401);
+
+  const res = await fetch(`${base}/api/backup`, { headers: { cookie: await sessionCookie('admin@clinic.local', 'newpassword1') } });
+  assert.equal(res.status, 200);
+  const bytes = Buffer.from(await res.arrayBuffer());
+  assert.equal(bytes.subarray(0, 15).toString(), 'SQLite format 3');
+});
+
+async function sessionCookie(email, password) {
+  const res = await fetch(`${base}/api/auth/login`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password }),
+  });
+  return res.headers.get('set-cookie').split(';')[0];
+}
+
+test('temporary passwords must be changed before using the app', async () => {
+  const fresh = createApp(openDb(':memory:'));
+  const srv = await new Promise((resolve) => { const s = fresh.listen(0, () => resolve(s)); });
+  const url = `http://127.0.0.1:${srv.address().port}`;
+  try {
+    const login = await fetch(`${url}/api/auth/login`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'doctor1@clinic.local', password: 'doctor123' }),
+    });
+    const cookie = login.headers.get('set-cookie').split(';')[0];
+    const call = (method, path, body) => fetch(url + path, {
+      method, headers: { 'content-type': 'application/json', cookie }, body: body && JSON.stringify(body),
+    });
+    const me = await (await call('GET', '/api/auth/me')).json();
+    assert.equal(me.user.must_change_password, 1);
+    const blocked = await call('GET', '/api/appointments');
+    assert.equal(blocked.status, 403);
+    assert.equal((await blocked.json()).code, 'password_change_required');
+    assert.equal((await call('POST', '/api/auth/change-password',
+      { current_password: 'doctor123', new_password: 'doctor123' })).status, 400);
+    assert.equal((await call('POST', '/api/auth/change-password',
+      { current_password: 'doctor123', new_password: 'a-better-password' })).status, 200);
+    assert.equal((await call('GET', '/api/appointments')).status, 200);
+  } finally {
+    srv.close();
+  }
+});
+
+test('production refuses to create the default admin password', () => {
+  const env = { ...process.env };
+  process.env.NODE_ENV = 'production';
+  delete process.env.ADMIN_PASSWORD;
+  try {
+    assert.throws(() => openDb(':memory:'), /ADMIN_PASSWORD/);
+    process.env.ADMIN_PASSWORD = 'owner-chosen-pass';
+    const db = openDb(':memory:');
+    const admin = db.prepare("SELECT * FROM users WHERE role = 'admin'").get();
+    assert.ok(verifyPassword('owner-chosen-pass', admin.password_hash));
+    assert.equal(admin.must_change_password, 0);
+    // Starter doctors must not have a guessable password on a public server.
+    for (const doc of db.prepare("SELECT * FROM users WHERE role = 'doctor'").all()) {
+      assert.equal(verifyPassword('doctor123', doc.password_hash), false);
+    }
+  } finally {
+    process.env.NODE_ENV = env.NODE_ENV;
+    if (env.ADMIN_PASSWORD !== undefined) process.env.ADMIN_PASSWORD = env.ADMIN_PASSWORD;
+    else delete process.env.ADMIN_PASSWORD;
+  }
 });

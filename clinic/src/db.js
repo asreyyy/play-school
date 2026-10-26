@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
+const crypto = require('node:crypto');
 const { hashPassword } = require('./auth');
 
 const SCHEMA = `
@@ -129,6 +130,7 @@ function openDb(file) {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
   db.exec(SCHEMA);
+  migrate(db);
   seed(db);
   return db;
 }
@@ -146,6 +148,14 @@ function tx(db, fn) {
   }
 }
 
+/** Small additive migrations for databases created by older versions. */
+function migrate(db) {
+  const cols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+  if (!cols.includes('must_change_password')) {
+    db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
+  }
+}
+
 function seed(db) {
   const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
   for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) insertSetting.run(k, v);
@@ -155,10 +165,14 @@ function seed(db) {
 
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@clinic.local';
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+  if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD) {
+    throw new Error('Set the ADMIN_PASSWORD environment variable before the first start in production.');
+  }
 
   tx(db, () => {
-    db.prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
-      .run('Clinic Admin', adminEmail, hashPassword(adminPassword), 'admin');
+    // Admin chose this password via ADMIN_PASSWORD in production; otherwise it is a default to replace.
+    db.prepare('INSERT INTO users (name, email, password_hash, role, must_change_password) VALUES (?, ?, ?, ?, ?)')
+      .run('Clinic Admin', adminEmail, hashPassword(adminPassword), 'admin', process.env.ADMIN_PASSWORD ? 0 : 1);
 
     const addService = db.prepare(
       'INSERT INTO services (name, description, duration_min, price) VALUES (?, ?, ?, ?)');
@@ -167,15 +181,18 @@ function seed(db) {
     addService.run('Therapy Session', 'Talk therapy / counselling session.', 45, 1200);
 
     // Three starter doctors with login accounts. Rename them from the admin panel.
+    // In production their passwords are random: the admin sets real ones under Doctors → Edit.
+    const production = process.env.NODE_ENV === 'production';
+    const doctorPassword = () => (production ? crypto.randomBytes(24).toString('hex') : 'doctor123');
     const addUser = db.prepare(
-      'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)');
+      'INSERT INTO users (name, email, password_hash, role, must_change_password) VALUES (?, ?, ?, ?, 1)');
     const addDoctor = db.prepare(
       'INSERT INTO doctors (user_id, name, title, qualifications, bio) VALUES (?, ?, ?, ?, ?)');
     const addHours = db.prepare(
       'INSERT INTO availability (doctor_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?)');
     for (let i = 1; i <= 3; i++) {
       const name = `Dr. Doctor ${i}`;
-      const user = addUser.run(name, `doctor${i}@clinic.local`, hashPassword('doctor123'), 'doctor');
+      const user = addUser.run(name, `doctor${i}@clinic.local`, hashPassword(doctorPassword()), 'doctor');
       const doc = addDoctor.run(user.lastInsertRowid, name, 'Consultant Psychiatrist', 'MBBS, MD (Psychiatry)',
         'Edit this profile from Admin → Doctors.');
       for (let wd = 1; wd <= 5; wd++) {
@@ -187,9 +204,17 @@ function seed(db) {
   });
 
   if (process.env.NODE_ENV !== 'test') {
-    console.log(`\nFirst run: created admin account ${adminEmail} / ${adminPassword}`);
-    console.log('Doctor accounts: doctor1@clinic.local, doctor2@clinic.local, doctor3@clinic.local / doctor123');
-    console.log('Change these passwords after logging in!\n');
+    if (process.env.ADMIN_PASSWORD) {
+      console.log(`\nFirst run: created admin account ${adminEmail} (password from ADMIN_PASSWORD).`);
+    } else {
+      console.log(`\nFirst run: created admin account ${adminEmail} / ${adminPassword}`);
+    }
+    if (process.env.NODE_ENV === 'production') {
+      console.log('Set each doctor\'s email and password in the staff dashboard under Doctors → Edit.\n');
+    } else {
+      console.log('Doctor accounts: doctor1@clinic.local, doctor2@clinic.local, doctor3@clinic.local / doctor123');
+      console.log('Each account must choose a new password on first sign-in.\n');
+    }
   }
 }
 

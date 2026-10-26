@@ -190,16 +190,24 @@ function renderDetails(w) {
         <select name="mode" class="form-select"><option value="in-person">In person at the clinic</option><option value="online">Online (video call)</option></select></div>
       <div class="col-12"><label class="form-label">Anything you'd like the doctor to know? <span class="text-muted small">(optional)</span></label>
         <textarea name="reason" class="form-control" rows="3" maxlength="1000"></textarea></div>
+      <div class="col-12"><div class="form-check">
+        <input class="form-check-input" type="checkbox" name="consent" id="consent" required>
+        <label class="form-check-label small" for="consent">I agree to the clinic storing my details to manage my appointment, as described in the
+          <a href="/privacy" target="_blank">privacy policy</a>.</label></div></div>
       <div class="col-12"><div id="form-error"></div>
         <button class="btn btn-brand btn-lg px-4" type="submit">Confirm booking</button></div>
     </form>`;
   w.querySelector('#details-form').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const btn = ev.submitter;
+    if (!ev.target.consent.checked) {
+      w.querySelector('#form-error').innerHTML = '<div class="alert alert-warning">Please tick the box to agree to the privacy policy.</div>';
+      return;
+    }
     btn.disabled = true;
     try {
       const { appointment } = await api('POST', '/api/public/book', {
-        ...formData(ev.target), doctor_id: state.doctor.id, service_id: state.service.id, date: state.date, time: state.time,
+        ...formData(ev.target), consent: ev.target.consent.checked, doctor_id: state.doctor.id, service_id: state.service.id, date: state.date, time: state.time,
       });
       state.booked = appointment;
       render();

@@ -69,6 +69,7 @@ module.exports = function publicRoutes(db) {
       throw new HttpError(403, 'Online booking is currently closed. Please call the clinic.');
     }
     const b = req.body || {};
+    if (b.consent !== true) throw bad('Please agree to the privacy policy to book.');
     const name = required(b.name, 'Name', 120);
     const patientPhone = phone(b.phone);
     const patientEmail = email(b.email);

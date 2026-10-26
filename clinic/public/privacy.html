@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy</title>
+  <link href="/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/styles.css" rel="stylesheet">
+</head>
+<body>
+  <!--
+    TEMPLATE: review this text (ideally with a lawyer) before launch and edit anything in [square brackets].
+    The clinic name, email, phone and address are filled in automatically from Clinic Settings.
+  -->
+  <div class="container py-5" style="max-width: 760px;">
+    <a href="/" class="small text-secondary">← Back to booking</a>
+    <h1 class="h2 mt-3 mb-1">Privacy Policy</h1>
+    <p class="text-muted small">Last updated: [date]</p>
+
+    <div class="card p-4 lh-lg">
+      <p><strong data-clinic-name>The clinic</strong> ("we", "us") respects your privacy. Mental-health care depends on trust,
+        and this page explains what personal information we collect through this website and how we protect it.</p>
+
+      <h2 class="h5 mt-3">What we collect</h2>
+      <ul>
+        <li><strong>When you book online:</strong> your name, phone number, email (optional), your chosen doctor, service, date and time,
+          and anything you choose to write in the booking form.</li>
+        <li><strong>During your care:</strong> your doctor may keep clinical notes about your sessions, as required for safe treatment.</li>
+      </ul>
+
+      <h2 class="h5 mt-3">Why we use it</h2>
+      <ul>
+        <li>To schedule, confirm, reschedule or cancel your appointments and contact you about them.</li>
+        <li>To provide and record your medical care.</li>
+        <li>For billing and to meet our legal and professional record-keeping duties.</li>
+      </ul>
+      <p>We do <strong>not</strong> sell your information or use it for advertising.</p>
+
+      <h2 class="h5 mt-3">Who can see it</h2>
+      <ul>
+        <li>Clinical notes can be read only by the doctor who wrote them and the clinic administrator.</li>
+        <li>Reception staff can see your contact details and appointments, but not clinical notes.</li>
+        <li>We share information outside the clinic only with your consent, or where the law requires it
+          (for example, to prevent serious harm).</li>
+        <li>Our website is hosted by [hosting provider, e.g. Render], which stores the data securely on our behalf.</li>
+      </ul>
+
+      <h2 class="h5 mt-3">How we protect it</h2>
+      <p>The website uses an encrypted (HTTPS) connection, staff accounts are password-protected, and access is limited by role.
+        Data is backed up regularly.</p>
+
+      <h2 class="h5 mt-3">How long we keep it</h2>
+      <p>We keep appointment and medical records for [number] years after your last visit, as required by [applicable medical record rules],
+        and then delete them securely.</p>
+
+      <h2 class="h5 mt-3">Your rights</h2>
+      <p>You can ask to see or correct your information, withdraw your consent, or ask us to delete information we are not legally required
+        to keep. To do this, or if you have any concern, contact us:</p>
+      <ul class="list-unstyled ms-3" id="contact"></ul>
+      <p class="small text-muted mb-0">[Optional: name of the person responsible for data protection / grievance officer.]</p>
+    </div>
+  </div>
+  <script src="/js/common.js"></script>
+  <script>
+    api('GET', '/api/public/info').then(({ settings: s }) => {
+      document.querySelectorAll('[data-clinic-name]').forEach((el) => { el.textContent = s.clinic_name; });
+      document.title = `Privacy Policy – ${s.clinic_name}`;
+      document.getElementById('contact').innerHTML = [
+        s.clinic_email && `<li>Email: ${esc(s.clinic_email)}</li>`,
+        s.clinic_phone && `<li>Phone: ${esc(s.clinic_phone)}</li>`,
+        s.clinic_address && `<li>Address: ${esc(s.clinic_address)}</li>`,
+      ].filter(Boolean).join('') || '<li>Please contact the clinic reception.</li>';
+    }).catch(() => {});
+  </script>
+</body>
+</html>

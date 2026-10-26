@@ -1,0 +1,22 @@
+# Render Blueprint: creates the clinic web service with a persistent disk.
+# In Render: New → Blueprint → pick this repository. See clinic/LAUNCH_GUIDE.md.
+services:
+  - type: web
+    name: clinic
+    runtime: docker
+    dockerContext: ./clinic
+    dockerfilePath: ./clinic/Dockerfile
+    plan: starter            # a paid plan is required for a persistent disk
+    region: singapore        # closest Render region to India; change if you are elsewhere
+    healthCheckPath: /healthz
+    envVars:
+      - key: ADMIN_EMAIL     # the admin login email (asked when you create the Blueprint)
+        sync: false
+      - key: ADMIN_PASSWORD  # the admin password (asked when you create the Blueprint)
+        sync: false
+      - key: TZ              # clinic timezone, used for slots and "today"
+        value: Asia/Kolkata
+    disk:
+      name: clinic-data
+      mountPath: /app/data   # database + daily backups live here and survive redeploys
+      sizeGB: 1

@@ -5,6 +5,8 @@ An appointment booking and clinic management app for a small psychiatry practice
 - **Patient website** (`/`): patients choose a service, a doctor and a free time slot and book online, with no account needed. They get a booking reference they can use to check or cancel the booking.
 - **Staff dashboard** (`/staff`): admins, doctors and receptionists manage appointments, patients, schedules and the clinic.
 
+> **Putting it online?** Follow the step-by-step [LAUNCH_GUIDE.md](LAUNCH_GUIDE.md). It's written for non-technical readers.
+
 ## Quick start
 
 Requires **Node.js 22.5 or newer** (it uses Node's built-in SQLite, so you don't need to install a database).
@@ -17,12 +19,14 @@ npm start
 
 Open http://localhost:3000 for the booking site and http://localhost:3000/staff for the dashboard.
 
-On first run the app creates these starter accounts. **Change the passwords right away** (Account → Change password):
+On first run (in development) the app creates these starter accounts. Each one must choose a new password on first sign-in:
 
 | Role   | Email                                                  | Password    |
 |--------|--------------------------------------------------------|-------------|
 | Admin  | `admin@clinic.local`                                   | `admin123`  |
 | Doctor | `doctor1@clinic.local`, `doctor2@…`, `doctor3@…`       | `doctor123` |
+
+In production (`NODE_ENV=production`) you must set `ADMIN_PASSWORD`, and the starter doctors get random passwords: set real ones under **Doctors → Edit**. Passwords set by an admin are always temporary.
 
 It also creates 3 placeholder doctors (Mon–Fri 10:00–13:00 and 14:00–18:00, Sat 10:00–14:00) and 3 services (Initial Consultation 60 min, Follow-up 30 min, Therapy 45 min). Rename and edit them under **Doctors**, **Working Hours** and **Services & Fees**.
 
@@ -58,12 +62,15 @@ It also creates 3 placeholder doctors (Mon–Fri 10:00–13:00 and 14:00–18:00
 | `TZ`              | system             | Clinic timezone, e.g. `Asia/Kolkata`                 |
 | `ADMIN_EMAIL`     | `admin@clinic.local` | First-run admin email                              |
 | `ADMIN_PASSWORD`  | `admin123`         | First-run admin password                             |
-| `COOKIE_SECURE`   | off                | Set to `1` when serving over HTTPS                   |
-| `TRUST_PROXY`     | off                | Set to `1` when behind a reverse proxy (nginx, etc.) |
+| `NODE_ENV`        | —                  | `production` turns on secure cookies & proxy trust   |
+| `COOKIE_SECURE`   | on in production   | Secure (HTTPS-only) session cookie                   |
+| `TRUST_PROXY`     | on in production   | Trust `X-Forwarded-*` from a reverse proxy           |
+| `BACKUP_DIR`      | `data/backups`     | Where daily automatic backups are written            |
+| `BACKUP_KEEP_DAYS`| `14`               | How many daily backups to keep                       |
 
-**Backups:** all data lives in the single `DB_FILE`. Back it up regularly, for example with a daily copy of `data/clinic.db`.
+**Backups:** all data lives in the single `DB_FILE`. The app writes a consistent daily copy to `BACKUP_DIR`, and admins can download one any time from **Clinic Settings → Download backup**.
 
-**Going live:** run the app behind HTTPS (for example nginx or Caddy) with `COOKIE_SECURE=1` and `TRUST_PROXY=1`. Patient mental-health data is sensitive, so check your local data-protection rules before you take real bookings.
+**Deploying:** a `Dockerfile` and a Render Blueprint (`render.yaml` in the repo root) are included. The health check is `GET /healthz`. Patient mental-health data is sensitive, so check your local data-protection rules before taking real bookings.
 
 ## Development
 
@@ -81,9 +88,11 @@ src/
   auth.js           password hashing, sessions, role checks
   slots.js          working hours → free slot calculation
   appointments.js   create / update rules (conflicts, status, payments)
+  backup.js         daily backups & on-demand copies (VACUUM INTO)
   routes/           public (booking), auth, staff (appointments, patients, notes), admin
 public/
   index.html, js/book.js     patient booking site
   staff.html, js/staff.js    staff dashboard (single page, no build step)
+  privacy.html               privacy policy template (review before launch)
 test/api.test.js
 ```

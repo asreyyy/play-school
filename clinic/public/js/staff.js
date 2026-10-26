@@ -79,7 +79,7 @@ async function boot() {
   } catch {
     return showLogin();
   }
-  await loadReference();
+  if (!app.user.must_change_password) await loadReference();
   showApp();
 }
 
@@ -158,7 +158,8 @@ const ROUTES = {
 };
 
 async function route() {
-  const [name, arg] = (location.hash.replace(/^#\/?/, '') || 'dashboard').split('/');
+  let [name, arg] = (location.hash.replace(/^#\/?/, '') || 'dashboard').split('/');
+  if (app.user.must_change_password) name = 'account';
   const fn = ROUTES[name] || renderDashboard;
   $$('#nav .nav-link').forEach((a) => a.classList.toggle('active',
     a.dataset.route === name || (name === 'patient' && a.dataset.route === 'patients')));
@@ -168,6 +169,10 @@ async function route() {
     await fn(arg);
   } catch (e) {
     if (e.status === 401) return showLogin();
+    if (e.data?.code === 'password_change_required') {
+      app.user.must_change_password = 1;
+      return route();
+    }
     view().innerHTML = `<div class="alert alert-danger">${esc(e.message)}</div>`;
   }
 }
@@ -1014,7 +1019,13 @@ async function renderSettings() {
       ${field('min_notice_hours', 'Minimum notice for booking/cancelling (hours)', 'number', 'min="0" max="168"')}
       <div class="col-12" data-error></div>
       <div class="col-12"><button class="btn btn-brand" type="submit">Save settings</button></div>
-    </div></form>`;
+    </div></form>
+    <div class="card p-4 mt-4">
+      <h2 class="h6 text-uppercase text-muted">Backup</h2>
+      <p class="small text-muted mb-3">The app saves a backup automatically every day. You can also download a full copy of all clinic data
+        (appointments, patients, notes) to keep somewhere safe — for example once a week. Keep this file private: it contains patient records.</p>
+      <a class="btn btn-outline-secondary align-self-start" href="/api/backup"><i class="fa-solid fa-download me-1"></i>Download backup</a>
+    </div>`;
   const form = $('#settings-form');
   onSubmit(form, async (f) => {
     f.online_booking_enabled = form.online_booking_enabled.checked ? '1' : '0';
@@ -1028,7 +1039,10 @@ async function renderSettings() {
 
 // ---------------------------------------------------------------- Account
 async function renderAccount() {
+  const forced = app.user.must_change_password;
   view().innerHTML = `${header('My Account')}
+    ${forced ? `<div class="alert alert-warning" style="max-width:480px"><i class="fa-solid fa-key me-2"></i>
+      <strong>Please choose your own password.</strong> You are using a temporary password. Pick a new one (at least 8 characters) to continue.</div>` : ''}
     <div class="card p-4" style="max-width:480px">
       <div class="mb-3"><div class="fw-semibold">${esc(app.user.name)}</div><div class="small text-muted">${esc(app.user.email)} · ${esc(app.user.role)}</div></div>
       <form id="pw-form">
@@ -1044,6 +1058,12 @@ async function renderAccount() {
     await api('POST', '/api/auth/change-password', f);
     form.reset();
     toast('Password updated.');
+    if (forced) {
+      app.user.must_change_password = 0;
+      await loadReference();
+      location.hash = '#/dashboard';
+      route();
+    }
   });
 }
 

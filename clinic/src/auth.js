@@ -37,7 +37,7 @@ function createSession(db, res, userId) {
   res.cookie(COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.COOKIE_SECURE === '1',
+    secure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === '1' : process.env.NODE_ENV === 'production',
     expires,
   });
 }
@@ -51,7 +51,7 @@ function destroySession(db, req, res) {
 /** Attaches req.user (with doctor_id for doctors) when a valid session cookie is present. */
 function loadUser(db) {
   const stmt = db.prepare(`
-    SELECT u.id, u.name, u.email, u.role, d.id AS doctor_id
+    SELECT u.id, u.name, u.email, u.role, u.must_change_password, d.id AS doctor_id
     FROM sessions s
     JOIN users u ON u.id = s.user_id AND u.active = 1
     LEFT JOIN doctors d ON d.user_id = u.id
@@ -73,6 +73,14 @@ function requireAuth(...roles) {
   };
 }
 
+/** Blocks everything except auth routes until a temporary password has been replaced. */
+function requirePasswordChanged(req, res, next) {
+  if (req.user?.must_change_password) {
+    return res.status(403).json({ error: 'Please choose a new password first.', code: 'password_change_required' });
+  }
+  next();
+}
+
 module.exports = {
-  hashPassword, verifyPassword, createSession, destroySession, loadUser, requireAuth,
+  requirePasswordChanged, hashPassword, verifyPassword, createSession, destroySession, loadUser, requireAuth,
 };
