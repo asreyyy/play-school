@@ -34,7 +34,7 @@ function patientFields(body, { partial }) {
   return out;
 }
 
-module.exports = function staffRoutes(db) {
+module.exports = function staffRoutes(db, notifier) {
   const r = express.Router();
   r.use(requireAuth());
 
@@ -73,7 +73,11 @@ module.exports = function staffRoutes(db) {
       WHERE a.date > ? AND a.date <= ? AND a.status IN ('pending','confirmed') ${scope}`)
       .get(today, addDays(today, 7), ...args).n;
 
-    const out = { today, todays, pending, upcomingCount };
+    const tomorrow = db.prepare(`${APPOINTMENT_SELECT}
+      WHERE a.date = ? AND a.status IN ('pending','confirmed') ${scope} ORDER BY a.start_time`)
+      .all(addDays(today, 1), ...args);
+
+    const out = { today, todays, pending, upcomingCount, tomorrow };
     if (req.user.role === 'admin') {
       const monthStart = `${today.slice(0, 8)}01`;
       out.month = db.prepare(`SELECT
@@ -150,6 +154,7 @@ module.exports = function staffRoutes(db) {
       force: Boolean(b.force),
       resolvePatient,
     });
+    notifier.bookingCreated(appt);
     res.status(201).json({ appointment: appt });
   });
 
@@ -161,7 +166,9 @@ module.exports = function staffRoutes(db) {
     if (isDoctor(req.user) && b.doctor_id !== undefined && Number(b.doctor_id) !== req.user.doctor_id) {
       throw forbidden();
     }
-    res.json({ appointment: updateAppointment(db, id, b) });
+    const updated = updateAppointment(db, id, b);
+    notifier.appointmentUpdated(appt, updated);
+    res.json({ appointment: updated });
   });
 
   r.get('/slots', (req, res) => {
