@@ -67,6 +67,31 @@ function onSubmit(form, handler) {
   });
 }
 
+// ---------------------------------------------------------------- WhatsApp
+/** wa.me link with the clinic's default country code added to local numbers. */
+function waLink(phone, text) {
+  let digits = String(phone).replace(/\D/g, '');
+  if (!String(phone).trim().startsWith('+')) {
+    digits = digits.replace(/^0+/, '');
+    if (digits.length <= 10) digits = (app.settings.phone_country_code || '91') + digits;
+  }
+  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+}
+
+function reminderText(a) {
+  const when = `${fmtDate(a.date, { weekday: 'long', day: 'numeric', month: 'long' })} at ${fmtTime(a.start_time)}`;
+  return [
+    `Hello ${a.patient_name}, this is ${app.settings.clinic_name} about your appointment with ${a.doctor_name} on ${when}.`,
+    a.mode === 'online'
+      ? (a.meeting_link ? `It is an online consultation. Join here: ${a.meeting_link}` : 'It is an online consultation; we will send you the video call link.')
+      : (app.settings.clinic_address ? `Address: ${app.settings.clinic_address}` : ''),
+    `Booking ref: ${a.reference}. Please reply here if you need to reschedule.`,
+  ].filter(Boolean).join('\n\n');
+}
+
+const waButton = (a, label = 'WhatsApp') => `<a class="btn btn-sm btn-success" target="_blank" rel="noopener"
+  href="${esc(waLink(a.patient_phone, reminderText(a)))}"><i class="fa-brands fa-whatsapp me-1"></i>${label}</a>`;
+
 // ---------------------------------------------------------------- Auth & boot
 async function boot() {
   try {
@@ -220,7 +245,7 @@ async function openAppointment(id) {
         <div class="col-md-7">
           <div class="mb-2">${statusBadge(a.status)} <span class="small text-muted ms-2">${a.source === 'online' ? 'Booked online' : 'Booked by staff'}</span></div>
           <h5 class="mb-1"><a href="#/patient/${a.patient_id}" data-close>${esc(a.patient_name)}</a></h5>
-          <div class="small text-muted mb-3"><i class="fa-solid fa-phone me-1"></i>${esc(a.patient_phone)}
+          <div class="small text-muted mb-3"><i class="fa-solid fa-phone me-1"></i><a href="tel:${esc(a.patient_phone)}">${esc(a.patient_phone)}</a>
             ${a.patient_email ? ` · <i class="fa-solid fa-envelope me-1"></i>${esc(a.patient_email)}` : ''}</div>
           <dl class="row small mb-0">
             <dt class="col-4">When</dt><dd class="col-8">${esc(fmtDate(a.date))}, ${fmtTime(a.start_time)}–${fmtTime(a.end_time)}</dd>
@@ -239,12 +264,18 @@ async function openAppointment(id) {
             </div>
             <button class="btn btn-sm btn-outline-secondary w-100" id="save-pay">Save payment</button>
           </div>
+          ${a.mode === 'online' ? `<div class="bg-light rounded p-3 mt-2">
+            <div class="small text-muted mb-1"><i class="fa-solid fa-video me-1"></i>Video call link</div>
+            <input class="form-control form-control-sm mb-2" id="appt-link" placeholder="https://meet.google.com/…" value="${esc(a.meeting_link)}">
+            <button class="btn btn-sm btn-outline-secondary w-100" id="save-link">Save link</button>
+          </div>` : ''}
         </div>
       </div>
       <hr>
       <div class="d-flex flex-wrap gap-2 mb-3">
         ${actions.map(([s, label, cls]) => `<button class="btn btn-sm btn-${cls}" data-status="${s}">${label}</button>`).join('')}
         ${['completed', 'cancelled'].includes(a.status) ? '' : '<button class="btn btn-sm btn-outline-brand" id="resched-toggle"><i class="fa-regular fa-calendar me-1"></i>Reschedule</button>'}
+        ${['pending', 'confirmed'].includes(a.status) ? waButton(a, 'WhatsApp reminder') : ''}
         ${isDoctor() ? `<a class="btn btn-sm btn-outline-dark ms-auto" href="#/patient/${a.patient_id}" data-close><i class="fa-solid fa-file-medical me-1"></i>Session notes</a>` : ''}
       </div>
       <form id="resched" class="d-none border rounded p-3">
@@ -278,6 +309,15 @@ async function openAppointment(id) {
       } catch (e) { fail(e); }
     };
   });
+  const saveLink = $('#save-link', m);
+  if (saveLink) {
+    saveLink.onclick = async () => {
+      try {
+        await api('PATCH', `/api/appointments/${a.id}`, { meeting_link: $('#appt-link', m).value });
+        after('Video call link saved.');
+      } catch (e) { fail(e); }
+    };
+  }
   $('#save-pay', m).onclick = async () => {
     try {
       await api('PATCH', `/api/appointments/${a.id}`, { fee: $('#appt-fee', m).value, payment_status: $('#appt-pay', m).value });
@@ -482,6 +522,19 @@ async function renderDashboard() {
             </div>`).join('') : empty('Nothing waiting. 🎉')}
         </div>
       </div>
+    </div>
+    <div class="card p-3 mt-4">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <h2 class="h5 mb-0">Tomorrow · send reminders</h2>
+        <span class="small text-muted">One tap opens WhatsApp with the reminder already written.</span>
+      </div>
+      ${d.tomorrow.length ? `<div class="list-group list-group-flush">${d.tomorrow.map((a) => `
+        <div class="list-group-item d-flex flex-wrap align-items-center gap-2 px-1">
+          <span class="timeline-time">${fmtTime(a.start_time)}</span>
+          <span class="flex-grow-1"><span class="fw-semibold">${esc(a.patient_name)}</span>
+            <span class="small text-muted d-block">${esc(a.service_name)}${isDoctor() ? '' : ` · ${esc(a.doctor_name)}`}${a.mode === 'online' ? ' · online' : ''}</span></span>
+          ${statusBadge(a.status)} ${waButton(a)}
+        </div>`).join('')}</div>` : '<div class="text-muted small">No appointments tomorrow.</div>'}
     </div>
     ${d.month ? `<div class="row g-3 mt-1">
       ${[['This month so far', d.month.total], ['Completed', d.month.completed || 0], ['No-shows', d.month.no_show || 0], ['Total patients', d.patientCount]]
@@ -996,7 +1049,8 @@ async function renderReports() {
 
 // ---------------------------------------------------------------- Admin: settings
 async function renderSettings() {
-  const { settings: s } = await api('GET', '/api/settings');
+  const { settings: s, email_enabled: emailOn } = await api('GET', '/api/settings');
+  const bookingUrl = `${location.origin}/`;
   const field = (key, label, type = 'text', extra = '') => `<div class="col-md-6"><label class="form-label">${label}</label>
     <input name="${key}" type="${type}" class="form-control" value="${esc(s[key])}" ${extra}></div>`;
   const toggle = (key, label) => `<div class="col-md-6"><div class="form-check form-switch mt-md-4">
@@ -1011,6 +1065,7 @@ async function renderSettings() {
       ${field('clinic_email', 'Email', 'email')}
       ${field('clinic_address', 'Address')}
       ${field('currency', 'Currency code (e.g. INR, USD)', 'text', 'maxlength="3"')}
+      ${field('phone_country_code', 'Phone country code for WhatsApp (e.g. 91)', 'text', 'maxlength="4"')}
       <div class="col-12 mt-4"><h2 class="h6 text-uppercase text-muted">Online booking</h2></div>
       ${toggle('online_booking_enabled', 'Allow patients to book online')}
       ${toggle('auto_confirm_online', 'Auto-confirm online bookings (otherwise staff confirm them)')}
@@ -1020,12 +1075,38 @@ async function renderSettings() {
       <div class="col-12" data-error></div>
       <div class="col-12"><button class="btn btn-brand" type="submit">Save settings</button></div>
     </div></form>
+    <div class="row g-4 mt-0">
+      <div class="col-lg-6"><div class="card p-4 h-100">
+        <h2 class="h6 text-uppercase text-muted">Share your booking link</h2>
+        <div class="input-group mb-3"><input class="form-control" readonly value="${esc(bookingUrl)}" id="booking-url">
+          <button class="btn btn-outline-secondary" type="button" id="copy-url">Copy</button></div>
+        <div class="d-flex gap-3 align-items-center">
+          <img src="/api/qr.svg" alt="QR code for the booking site" width="140" height="140" class="border rounded bg-white">
+          <div class="small text-muted">Print this QR code on posters, visiting cards or your reception desk.
+            Patients scan it with their phone camera to book.<br>
+            <a href="/api/qr.svg" download="booking-qr.svg" class="btn btn-sm btn-outline-secondary mt-2"><i class="fa-solid fa-download me-1"></i>Download QR code</a></div>
+        </div>
+      </div></div>
+      <div class="col-lg-6"><div class="card p-4 h-100">
+        <h2 class="h6 text-uppercase text-muted">Email notifications</h2>
+        ${emailOn
+          ? `<p class="mb-1"><span class="badge text-bg-success">On</span></p>
+             <p class="small text-muted mb-0">New online bookings are emailed to the clinic email above. Patients who give an email
+               receive confirmations, reschedules and cancellations.</p>`
+          : `<p class="mb-1"><span class="badge text-bg-secondary">Off</span></p>
+             <p class="small text-muted mb-0">To get an email for every new booking (and send patients confirmations), add email
+               settings on the hosting server. See "Email notifications" in the launch guide.</p>`}
+      </div></div>
+    </div>
     <div class="card p-4 mt-4">
       <h2 class="h6 text-uppercase text-muted">Backup</h2>
       <p class="small text-muted mb-3">The app saves a backup automatically every day. You can also download a full copy of all clinic data
         (appointments, patients, notes) to keep somewhere safe — for example once a week. Keep this file private: it contains patient records.</p>
       <a class="btn btn-outline-secondary align-self-start" href="/api/backup"><i class="fa-solid fa-download me-1"></i>Download backup</a>
     </div>`;
+  $('#copy-url').onclick = async () => {
+    try { await navigator.clipboard.writeText(bookingUrl); toast('Link copied.'); } catch { $('#booking-url').select(); }
+  };
   const form = $('#settings-form');
   onSubmit(form, async (f) => {
     f.online_booking_enabled = form.online_booking_enabled.checked ? '1' : '0';

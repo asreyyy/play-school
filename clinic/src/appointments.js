@@ -110,6 +110,12 @@ function updateAppointment(db, id, changes) {
       fields.mode = changes.mode;
     }
     if (changes.reason !== undefined) fields.reason = String(changes.reason).slice(0, 1000);
+    if (changes.meeting_link !== undefined) {
+      const link = String(changes.meeting_link).trim();
+      if (link && !/^https:\/\/\S+$/.test(link)) throw bad('Video call link must start with https://');
+      if (link.length > 500) throw bad('Video call link is too long.');
+      fields.meeting_link = link;
+    }
     if (changes.fee !== undefined) {
       const fee = Number(changes.fee);
       if (!Number.isFinite(fee) || fee < 0) throw bad('Invalid fee.');

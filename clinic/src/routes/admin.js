@@ -16,7 +16,7 @@ function password(v) {
 
 const bool = (v) => (v ? 1 : 0);
 
-module.exports = function adminRoutes(db) {
+module.exports = function adminRoutes(db, notifier) {
   const r = express.Router();
   r.use(requireAuth());
   const admin = requireAuth('admin');
@@ -275,11 +275,15 @@ module.exports = function adminRoutes(db) {
   });
 
   // ---------- Settings ----------
-  r.get('/settings', (_req, res) => res.json({ settings: getSettings(db) }));
+  r.get('/settings', (_req, res) => res.json({ settings: getSettings(db), email_enabled: notifier.enabled }));
 
   r.put('/settings', admin, (req, res) => {
     const b = req.body || {};
     const numeric = { slot_interval_min: [5, 240], booking_window_days: [1, 365], min_notice_hours: [0, 168] };
+    if (b.phone_country_code !== undefined && !/^\d{1,4}$/.test(String(b.phone_country_code).replace('+', ''))) {
+      throw bad('Country code must be digits only, e.g. 91.');
+    }
+    if (b.phone_country_code !== undefined) b.phone_country_code = String(b.phone_country_code).replace('+', '');
     const set = db.prepare('UPDATE settings SET value = ? WHERE key = ?');
     tx(db, () => {
       for (const key of Object.keys(DEFAULT_SETTINGS)) {

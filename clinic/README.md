@@ -51,6 +51,10 @@ It also creates 3 placeholder doctors (Mon–Fri 10:00–13:00 and 14:00–18:00
 - **Patient records**: contact details, emergency contact, visit history, and private session notes linked to visits.
 - **Working hours & leave**: multiple blocks per day (for lunch breaks). Adding leave warns you about appointments that clash with it.
 - **Reports**: appointments, completions, no-shows, cancellations, money collected and money outstanding, broken down by doctor and by service for any date range.
+- **Reminders**: one-tap WhatsApp reminders (pre-written message, including the video link for online sessions), and a "Tomorrow" list on the dashboard.
+- **Email notifications** (optional, via SMTP): new-booking alerts to the clinic, and confirmation/reschedule/cancellation emails to patients.
+- **Patients**: "Add to calendar" (Google / .ics) after booking, and the video-call link under Manage My Booking.
+- **Sharing & SEO**: QR code of the booking link, clinic details in page metadata and schema.org data, robots.txt.
 - **Settings**: clinic name/contact (shown on the booking site), currency, slot interval, booking window, notice period, and switches for online booking and auto-confirm.
 
 ## Configuration (environment variables)
@@ -67,6 +71,8 @@ It also creates 3 placeholder doctors (Mon–Fri 10:00–13:00 and 14:00–18:00
 | `TRUST_PROXY`     | on in production   | Trust `X-Forwarded-*` from a reverse proxy           |
 | `BACKUP_DIR`      | `data/backups`     | Where daily automatic backups are written            |
 | `BACKUP_KEEP_DAYS`| `14`               | How many daily backups to keep                       |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | — | Optional email notifications (new-booking alerts to the clinic email; confirmations to patients) |
+| `PUBLIC_URL`      | Render's URL       | Public site address, used in emails and the QR code  |
 
 **Backups:** all data lives in the single `DB_FILE`. The app writes a consistent daily copy to `BACKUP_DIR`, and admins can download one any time from **Clinic Settings → Download backup**.
 
@@ -89,10 +95,11 @@ src/
   slots.js          working hours → free slot calculation
   appointments.js   create / update rules (conflicts, status, payments)
   backup.js         daily backups & on-demand copies (VACUUM INTO)
+  notify.js         optional email notifications (nodemailer)
   routes/           public (booking), auth, staff (appointments, patients, notes), admin
 public/
   index.html, js/book.js     patient booking site
   staff.html, js/staff.js    staff dashboard (single page, no build step)
   privacy.html               privacy policy template (review before launch)
-test/api.test.js
+test/              API tests (node:test); CI runs them via .github/workflows/clinic-tests.yml
 ```

@@ -123,6 +123,7 @@ const DEFAULT_SETTINGS = {
   min_notice_hours: '2',
   auto_confirm_online: '0',
   online_booking_enabled: '1',
+  phone_country_code: '91',
 };
 
 function openDb(file) {
@@ -153,6 +154,10 @@ function migrate(db) {
   const cols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   if (!cols.includes('must_change_password')) {
     db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
+  }
+  const apptCols = db.prepare('PRAGMA table_info(appointments)').all().map((c) => c.name);
+  if (!apptCols.includes('meeting_link')) {
+    db.exec("ALTER TABLE appointments ADD COLUMN meeting_link TEXT NOT NULL DEFAULT ''");
   }
 }
 

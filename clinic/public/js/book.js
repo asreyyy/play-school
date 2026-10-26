@@ -219,6 +219,25 @@ function renderDetails(w) {
   });
 }
 
+/** Calendar links for a booking (times are clinic-local, which matches the patient's in most cases). */
+function calendarLinks(a) {
+  const stamp = (d, t) => `${d.replace(/-/g, '')}T${t.replace(':', '')}00`;
+  const s = state.info.settings;
+  const title = `Appointment – ${s.clinic_name}`;
+  const details = `${a.service_name} with ${a.doctor_name}. Booking ref ${a.reference}.`;
+  const location = a.mode === 'online' ? 'Online' : s.clinic_address;
+  const google = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+    + `&text=${encodeURIComponent(title)}&dates=${stamp(a.date, a.start_time)}/${stamp(a.date, a.end_time)}`
+    + `&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location || '')}`;
+  const icsEsc = (v) => String(v || '').replace(/[\\,;]/g, (c) => `\\${c}`);
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Clinic//Booking//EN', 'BEGIN:VEVENT',
+    `UID:${a.reference}@clinic`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)}Z`,
+    `DTSTART:${stamp(a.date, a.start_time)}`, `DTEND:${stamp(a.date, a.end_time)}`,
+    `SUMMARY:${icsEsc(title)}`, `DESCRIPTION:${icsEsc(details)}`, `LOCATION:${icsEsc(location)}`,
+    'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  return { google, ics: `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}` };
+}
+
 function renderDone() {
   const a = state.booked;
   $('#steps').innerHTML = '';
@@ -234,6 +253,12 @@ function renderDone() {
         <li><strong>${esc(fmtDate(a.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}</strong> at <strong>${fmtTime(a.start_time)}</strong></li>
         <li>${esc(a.service_name)} with ${esc(a.doctor_name)} (${a.mode === 'online' ? 'online' : 'in person'})</li>
       </ul>
+      <div class="d-flex flex-wrap justify-content-center gap-2 mb-3">
+        <a class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener" href="${esc(calendarLinks(a).google)}">
+          <i class="fa-brands fa-google me-1"></i>Add to Google Calendar</a>
+        <a class="btn btn-sm btn-outline-secondary" download="appointment.ics" href="${esc(calendarLinks(a).ics)}">
+          <i class="fa-regular fa-calendar-plus me-1"></i>Add to phone calendar</a>
+      </div>
       <button class="btn btn-outline-brand" id="book-another">Book another appointment</button>
     </div>`;
   $('#book-another').onclick = () => {
@@ -250,6 +275,8 @@ function bookingCard(a, phone) {
         <div class="fw-semibold">${esc(a.service_name)} with ${esc(a.doctor_name)}</div>
         <div class="text-secondary small">${esc(fmtDate(a.date))} · ${fmtTime(a.start_time)}–${fmtTime(a.end_time)} · ${esc(a.mode)}</div>
         <div class="small mt-1">Ref <strong>${esc(a.reference)}</strong></div>
+        ${a.meeting_link ? `<a class="btn btn-sm btn-brand mt-2" target="_blank" rel="noopener" href="${esc(a.meeting_link)}">
+          <i class="fa-solid fa-video me-1"></i>Join video call</a>` : ''}
       </div>
       ${statusBadge(a.status)}
     </div>

@@ -11,7 +11,7 @@ const PUBLIC_SETTINGS = [
   'booking_window_days', 'online_booking_enabled',
 ];
 
-module.exports = function publicRoutes(db) {
+module.exports = function publicRoutes(db, notifier) {
   const r = express.Router();
 
   function slotOptions() {
@@ -95,6 +95,7 @@ module.exports = function publicRoutes(db) {
           .run(name, patientPhone, patientEmail).lastInsertRowid;
       },
     });
+    notifier.bookingCreated(appt);
     res.status(201).json({ appointment: publicView(appt) });
   });
 
@@ -124,6 +125,7 @@ module.exports = function publicRoutes(db) {
       throw bad(`Bookings can only be cancelled online at least ${hours} hour(s) in advance. Please call the clinic.`);
     }
     db.prepare("UPDATE appointments SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?").run(appt.id);
+    notifier.cancelledByPatient(appt);
     res.json({ appointment: publicView({ ...appt, status: 'cancelled' }) });
   });
 
@@ -135,5 +137,6 @@ function publicView(a) {
     reference: a.reference, date: a.date, start_time: a.start_time, end_time: a.end_time,
     status: a.status, mode: a.mode, doctor_name: a.doctor_name, service_name: a.service_name,
     patient_name: a.patient_name, fee: a.fee,
+    meeting_link: ['pending', 'confirmed'].includes(a.status) ? a.meeting_link : '',
   };
 }

@@ -21,27 +21,9 @@ The app itself is already finished and tested. What's left are the steps that ne
 
 ---
 
-## Step 1: Give Claude access to your GitHub repository
+## Steps 1–2: Code on GitHub ✅ (already done)
 
-The code is ready, but Claude couldn't upload ("push") it to your GitHub because access was refused.
-
-1. Go to **https://claude.ai/connect-github** and connect (or reconnect) your GitHub account.
-2. If it asks you to install the **Claude GitHub App**, install it and choose the `play-school` repository.
-3. Come back to the chat and say **"access fixed, please push"**.
-
-✅ **Done when:** Claude confirms the code has been pushed.
-
-## Step 2: Move the code to the main branch
-
-The code is on a separate "branch" (a draft copy) called `claude/clinic-booking-management-app-5hpg0e`. Render will use your **main** branch, so the code needs to be merged into it.
-
-The easiest way: ask Claude **"open a pull request and tell me how to merge it"**. Or do it yourself:
-
-1. Open your repository on github.com.
-2. You'll see a yellow banner, "*claude/clinic-… had recent pushes*". Click **Compare & pull request**.
-3. Click **Create pull request**, then **Merge pull request**, then **Confirm merge**.
-
-✅ **Done when:** you can see a `clinic` folder and a `render.yaml` file on the main page of your repository.
+The app is in your repository's **main** branch, in the `clinic` folder. GitHub also re-runs the app's automatic tests every time the code changes; you can see them under the repository's **Actions** tab. A green tick means everything passed.
 
 ## Step 3: Create your Render account
 
@@ -50,6 +32,10 @@ The easiest way: ask Claude **"open a pull request and tell me how to merge it"*
 3. Add your card under **Billing** when asked.
 
 ## Step 4: Create the app on Render (one-time)
+
+**Option A – let Claude do it:** in Render go to **Account Settings → API Keys → Create API Key**. Then in claude.ai go to **Settings → Connectors → Render → Connect** and paste the key there (never in the chat). Start a new Claude Code session on this repository and say *"Deploy the clinic app to Render using the Render connector"*. Claude will stop and ask you to type the admin email and password into Render yourself.
+
+**Option B – do it yourself (about 5 clicks):**
 
 The repository includes a file (`render.yaml`) that tells Render exactly how to set everything up, so you only fill in two things.
 
@@ -112,7 +98,33 @@ If anything looks wrong, describe it to Claude (a screenshot helps).
 
 ✅ **Done when:** `https://www.yourdomain` opens your booking page with a padlock in the address bar.
 
+## Step 8b: Turn on email notifications (optional, recommended)
+
+With email turned on, the app:
+- emails **you** (the clinic email in Clinic Settings) every time a patient books online, so you don't have to keep checking the dashboard;
+- emails **patients** who gave an email address when their booking is received, confirmed, rescheduled or cancelled, including the video-call link for online consultations. These emails contain no clinical details.
+
+The simplest way is to use a Gmail account (ideally a separate one for the clinic):
+1. Sign in to that Gmail account and turn on **2-Step Verification** (Google Account → Security).
+2. Go to Google Account → Security → **App passwords**, create one named "Clinic app", and copy the 16-letter password. This is a security key, so keep it private.
+3. In Render, open your **clinic** service, go to **Environment**, then **Add Environment Variable**, and add these one by one:
+
+   | Key | Value |
+   |---|---|
+   | `SMTP_HOST` | `smtp.gmail.com` |
+   | `SMTP_PORT` | `465` |
+   | `SMTP_USER` | the Gmail address |
+   | `SMTP_PASS` | the 16-letter app password |
+   | `MAIL_FROM` | `Your Clinic Name <the Gmail address>` |
+   | `PUBLIC_URL` | your website address, e.g. `https://www.yourclinic.in` (used for links in emails) |
+4. Click **Save Changes**. Render restarts the app automatically.
+5. In the staff dashboard, open **Clinic Settings**. "Email notifications" should now say **On**. Make a test booking with your own email to check.
+
+(Any email provider works. Zoho Mail, Brevo and others give you SMTP settings in the same format.)
+
 ## Step 9: Launch! 🎉
+
+In the staff dashboard, open **Clinic Settings → Share your booking link**. There you can copy your link and download a **QR code** to print on posters, visiting cards and your reception desk.
 
 Share your booking link:
 - On your **Google Business Profile** (add it as the "Appointment link"). This is very effective.
@@ -125,14 +137,14 @@ Share your booking link:
 | How often | What to do |
 |---|---|
 | **Every morning** | Open the Dashboard. Confirm or decline bookings under *Awaiting confirmation*. Check today's schedule. |
+| **Every evening** | On the Dashboard, under **Tomorrow · send reminders**, tap the green **WhatsApp** button next to each patient. WhatsApp opens with the reminder already written; just press send. |
+| **For online consultations** | Create a Google Meet / Zoom link and paste it into the appointment's **Video call link** box. The patient sees it under *Manage My Booking*, in the WhatsApp reminder, and by email (if email is on). |
 | **After each appointment** | Mark it *Completed* (or *No-show*) and record the payment as *Paid*. |
 | **When a doctor takes leave** | Add it under *Working Hours → Leave* so patients can't book those days. |
 | **Every week** | Clinic Settings, then **Download backup**. Store the file somewhere private and safe, such as an encrypted drive. It contains patient records, so never email it or share it. |
 | **Every month** | Look at **Reports**: appointments, no-shows and money collected/outstanding. |
 
 **Automatic safety nets:** the app saves its own backup every day and keeps the last 14 days. Render also takes daily snapshots of the disk.
-
-**Online consultations:** the app records that a booking is "online", but it doesn't create video calls. Send the patient a Google Meet / Zoom / WhatsApp video link yourself.
 
 ## If something goes wrong
 
@@ -146,6 +158,6 @@ Share your booking link:
 Every time new code is merged into the main branch on GitHub, Render automatically updates the website within a few minutes. Your data stays safe on the disk.
 
 Ideas for later (ask Claude any time):
-- SMS / WhatsApp / email appointment reminders (needs an account with a messaging provider)
+- Fully automatic SMS / WhatsApp reminders, sent without a tap (needs an account with a messaging provider such as Twilio or Gupshup)
 - Online payment at booking (e.g. Razorpay)
 - Printable prescriptions or invoices

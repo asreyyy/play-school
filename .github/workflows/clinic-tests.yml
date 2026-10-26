@@ -1,0 +1,23 @@
+name: Clinic app tests
+
+on:
+  push:
+    paths: ['clinic/**', '.github/workflows/clinic-tests.yml']
+  pull_request:
+    paths: ['clinic/**', '.github/workflows/clinic-tests.yml']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clinic
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: clinic/package-lock.json
+      - run: npm ci
+      - run: npm test
