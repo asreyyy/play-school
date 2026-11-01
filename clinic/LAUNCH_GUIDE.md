@@ -139,6 +139,7 @@ Share your booking link:
 | **Every morning** | Open the Dashboard. Confirm or decline bookings under *Awaiting confirmation*. Check today's schedule. |
 | **Every evening** | On the Dashboard, under **Tomorrow · send reminders**, tap the green **WhatsApp** button next to each patient. WhatsApp opens with the reminder already written; just press send. |
 | **For online consultations** | Create a Google Meet / Zoom link and paste it into the appointment's **Video call link** box. The patient sees it under *Manage My Booking*, in the WhatsApp reminder, and by email (if email is on). |
+| **When a new patient arrives** | **Patients → Register patient**. Fill in their details and the bystander who came with them. The patient ID is given automatically; write it on their file, or click **Print card** on their page. |
 | **After each appointment** | Mark it *Completed* (or *No-show*) and record the payment as *Paid*. |
 | **When a doctor takes leave** | Add it under *Working Hours → Leave* so patients can't book those days. |
 | **Every week** | Clinic Settings, then **Download backup**. Store the file somewhere private and safe, such as an encrypted drive. It contains patient records, so never email it or share it. |

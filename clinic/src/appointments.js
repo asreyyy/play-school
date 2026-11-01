@@ -9,7 +9,7 @@ const MODES = ['in-person', 'online'];
 const PAYMENT_STATUSES = ['unpaid', 'paid', 'waived'];
 
 const APPOINTMENT_SELECT = `
-  SELECT a.*, p.name AS patient_name, p.phone AS patient_phone, p.email AS patient_email,
+  SELECT a.*, p.patient_code, p.name AS patient_name, p.phone AS patient_phone, p.email AS patient_email,
          d.name AS doctor_name, s.name AS service_name, s.duration_min
   FROM appointments a
   JOIN patients p ON p.id = a.patient_id
