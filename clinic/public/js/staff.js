@@ -173,6 +173,7 @@ const ROUTES = {
   appointments: renderAppointments,
   patients: renderPatients,
   patient: renderPatient,
+  register: () => renderPatientForm(),
   schedule: renderSchedule,
   doctors: renderDoctors,
   services: renderServices,
@@ -183,15 +184,15 @@ const ROUTES = {
 };
 
 async function route() {
-  let [name, arg] = (location.hash.replace(/^#\/?/, '') || 'dashboard').split('/');
+  let [name, ...args] = (location.hash.replace(/^#\/?/, '') || 'dashboard').split('/');
   if (app.user.must_change_password) name = 'account';
   const fn = ROUTES[name] || renderDashboard;
   $$('#nav .nav-link').forEach((a) => a.classList.toggle('active',
-    a.dataset.route === name || (name === 'patient' && a.dataset.route === 'patients')));
+    a.dataset.route === name || (['patient', 'register'].includes(name) && a.dataset.route === 'patients')));
   $('#sidebar').classList.remove('open');
   view().innerHTML = '<div class="text-center py-5"><div class="spinner-border text-secondary"></div></div>';
   try {
-    await fn(arg);
+    await fn(...args);
   } catch (e) {
     if (e.status === 401) return showLogin();
     if (e.data?.code === 'password_change_required') {
@@ -368,7 +369,7 @@ function newAppointment(preset = {}) {
         ${preset.patient
           ? `<div class="form-control bg-light">${esc(preset.patient.name)} · ${esc(preset.patient.phone)}</div>`
           : `<div class="input-group mb-2"><span class="input-group-text"><i class="fa-solid fa-magnifying-glass"></i></span>
-               <input class="form-control" id="pt-search" placeholder="Search existing patient by name or phone"></div>
+               <input class="form-control" id="pt-search" placeholder="Search existing patient by ID, name or phone"></div>
              <div id="pt-results" class="list-group mb-2"></div>
              <div id="pt-chosen"></div>
              <div class="row g-2" id="pt-new">
@@ -413,7 +414,8 @@ function newAppointment(preset = {}) {
         if (q.length < 2) { box.innerHTML = ''; return; }
         const { patients } = await api('GET', `/api/patients?q=${encodeURIComponent(q)}`);
         box.innerHTML = patients.slice(0, 6).map((p) => `<button type="button" class="list-group-item list-group-item-action" data-pid="${p.id}"
-          data-label="${esc(p.name)} · ${esc(p.phone)}">${esc(p.name)} <span class="text-muted small">${esc(p.phone)}</span></button>`).join('')
+          data-label="${esc(p.patient_code)} · ${esc(p.name)} · ${esc(p.phone)}"><span class="badge bg-brand-soft text-brand me-1">${esc(p.patient_code)}</span>${esc(p.name)}
+          <span class="text-muted small">${esc(p.phone)}${p.bystander_name ? ` · bystander ${esc(p.bystander_name)}` : ''}</span></button>`).join('')
           || '<div class="small text-muted">No match — fill in the new patient fields below.</div>';
         $$('[data-pid]', box).forEach((b) => {
           b.onclick = () => {
@@ -650,78 +652,243 @@ async function renderAppointments() {
 }
 
 // ---------------------------------------------------------------- Patients
+const RELATIONS = ['Mother', 'Father', 'Spouse', 'Son', 'Daughter', 'Brother', 'Sister', 'Guardian', 'Friend', 'Other'];
+const GENDERS = ['Female', 'Male', 'Other', 'Prefer not to say'];
+let bookAfterOpen = null; // patient id to open the booking dialog for after "Save & book"
+
+function ageOf(dob) {
+  if (!dob) return null;
+  const b = new Date(`${dob}T00:00:00`);
+  const now = new Date();
+  let age = now.getFullYear() - b.getFullYear();
+  if (now < new Date(now.getFullYear(), b.getMonth(), b.getDate())) age--;
+  return age >= 0 ? age : null;
+}
+const ageGender = (p) => [ageOf(p.dob) !== null ? `${ageOf(p.dob)} yrs` : '', p.gender].filter(Boolean).join(' · ');
+
+/** The patient ID card, used for the live preview on the form, the profile page and printing. */
+function patientCardHtml(p, code) {
+  const bystander = p.bystander_name || p.bystander_phone;
+  return `<div class="patient-card">
+    <div class="pc-head"><span><i class="fa-solid fa-leaf me-1"></i>${esc(app.settings.clinic_name)}</span>
+      <span class="pc-code">${esc(code || '—')}</span></div>
+    <div class="pc-body">
+      <span class="pc-avatar">${esc(initials(p.name) || '?')}</span>
+      <div class="min-w-0">
+        <div class="pc-name">${esc(p.name) || '<span class="opacity-50">Patient name</span>'}</div>
+        <div class="pc-meta">${esc(ageGender(p)) || '&nbsp;'}</div>
+        <div class="pc-meta"><i class="fa-solid fa-phone me-1"></i>${esc(p.phone) || '—'}</div>
+      </div>
+    </div>
+    <div class="pc-foot">
+      <div class="pc-label">Bystander</div>
+      <div>${bystander ? `${esc(p.bystander_name) || '—'}${p.bystander_relation ? ` (${esc(p.bystander_relation)})` : ''}
+        ${p.bystander_phone ? ` · <i class="fa-solid fa-phone mx-1"></i>${esc(p.bystander_phone)}` : ''}` : '<span class="opacity-75">Not given</span>'}</div>
+    </div>
+  </div>`;
+}
+
+function printPatientCard(p) {
+  let area = $('#print-area');
+  if (!area) {
+    area = document.createElement('div');
+    area.id = 'print-area';
+    document.body.append(area);
+  }
+  area.innerHTML = patientCardHtml(p, p.patient_code);
+  window.print();
+}
+
 let patientQuery = '';
 async function renderPatients() {
   const { patients } = await api('GET', `/api/patients?q=${encodeURIComponent(patientQuery)}`);
-  view().innerHTML = `${header('Patients', '<button class="btn btn-brand" id="new-pt"><i class="fa-solid fa-user-plus me-1"></i>New patient</button>')}
-    <div class="card p-3 mb-3"><input class="form-control" id="pt-q" placeholder="Search by name, phone or email" value="${esc(patientQuery)}"></div>
+  view().innerHTML = `${header('Patients', '<a class="btn btn-brand" href="#/register"><i class="fa-solid fa-user-plus me-1"></i>Register patient</a>')}
+    <div class="card p-3 mb-3"><div class="input-group"><span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+      <input class="form-control" id="pt-q" placeholder="Search by patient ID, name, phone, or bystander name / phone" value="${esc(patientQuery)}"></div></div>
     <div class="card p-2">${patients.length ? `<div class="table-responsive"><table class="table table-hover mb-0">
-      <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Visits</th><th>Last visit</th><th>Next visit</th></tr></thead>
+      <thead><tr><th>ID</th><th>Patient</th><th>Phone</th><th>Bystander</th><th>Visits</th><th>Next visit</th></tr></thead>
       <tbody>${patients.map((p) => `<tr data-pid="${p.id}">
-        <td class="fw-semibold">${esc(p.name)}</td><td>${esc(p.phone)}</td><td>${esc(p.email)}</td><td>${p.visit_count}</td>
-        <td>${esc(fmtDate(p.last_visit)) || '—'}</td><td>${esc(fmtDate(p.next_visit)) || '—'}</td></tr>`).join('')}</tbody></table></div>`
+        <td><span class="badge bg-brand-soft text-brand fw-semibold">${esc(p.patient_code)}</span></td>
+        <td><div class="fw-semibold">${esc(p.name)}</div><div class="small text-muted">${esc(ageGender(p))}</div></td>
+        <td>${esc(p.phone)}</td>
+        <td>${p.bystander_name || p.bystander_phone ? `<div>${esc(p.bystander_name)}${p.bystander_relation ? ` <span class="small text-muted">(${esc(p.bystander_relation)})</span>` : ''}</div>
+          <div class="small text-muted">${esc(p.bystander_phone)}</div>` : '<span class="text-muted">—</span>'}</td>
+        <td>${p.visit_count}</td><td>${esc(fmtDate(p.next_visit)) || '—'}</td></tr>`).join('')}</tbody></table></div>`
       : empty(patientQuery ? 'No patients match your search.' : 'No patients yet.')}</div>`;
   const q = $('#pt-q');
   let timer;
   q.oninput = () => { clearTimeout(timer); timer = setTimeout(() => { patientQuery = q.value.trim(); renderPatients().catch(fail); }, 350); };
   if (patientQuery) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
   $$('[data-pid]').forEach((tr) => { tr.onclick = () => { location.hash = `#/patient/${tr.dataset.pid}`; }; });
-  $('#new-pt').onclick = () => patientForm();
 }
 
-function patientForm(p = {}) {
-  const m = openModal({
-    title: p.id ? 'Edit patient' : 'New patient',
-    size: 'modal-lg',
-    body: `<form id="pt-form" class="row g-3">
-      <div class="col-md-6"><label class="form-label">Full name *</label><input name="name" class="form-control" required value="${esc(p.name)}"></div>
-      <div class="col-md-6"><label class="form-label">Phone *</label><input name="phone" class="form-control" required value="${esc(p.phone)}"></div>
-      <div class="col-md-6"><label class="form-label">Email</label><input name="email" type="email" class="form-control" value="${esc(p.email)}"></div>
-      <div class="col-md-3"><label class="form-label">Date of birth</label><input name="dob" type="date" class="form-control" value="${esc(p.dob)}"></div>
-      <div class="col-md-3"><label class="form-label">Gender</label><select name="gender" class="form-select">
-        ${options(['', 'Female', 'Male', 'Other', 'Prefer not to say'].map((g) => ({ id: g, name: g || '—' })), p.gender)}</select></div>
-      <div class="col-md-6"><label class="form-label">Address</label><input name="address" class="form-control" value="${esc(p.address)}"></div>
-      <div class="col-md-6"><label class="form-label">Emergency contact</label><input name="emergency_contact" class="form-control" placeholder="Name & phone" value="${esc(p.emergency_contact)}"></div>
-      <div class="col-12"><label class="form-label">Admin notes <span class="small text-muted">(non-clinical, visible to all staff)</span></label>
-        <textarea name="notes" class="form-control" rows="2">${esc(p.notes)}</textarea></div>
-      <div class="col-12" data-error></div>
-      <div class="col-12 text-end"><button class="btn btn-brand" type="submit">Save</button></div>
-    </form>`,
-  });
-  onSubmit($('#pt-form', m), async (f) => {
-    const r = p.id ? await api('PATCH', `/api/patients/${p.id}`, f) : await api('POST', '/api/patients', f);
-    closeModal();
-    toast('Patient saved.');
-    if (p.id) refresh(); else location.hash = `#/patient/${r.patient.id}`;
+/** Full-page registration form (new patient) or edit form (existing patient). */
+async function renderPatientForm(id) {
+  const editing = Boolean(id);
+  const p = editing ? (await api('GET', `/api/patients/${id}`)).patient : {};
+  const code = editing ? p.patient_code : (await api('GET', '/api/patients/next-id')).patient_code;
+  const back = editing ? `#/patient/${id}` : '#/patients';
+  const step = (n, title, icon) => `<div class="reg-step"><span>${n}</span><i class="fa-solid ${icon} me-2 text-brand"></i>${title}</div>`;
+
+  view().innerHTML = `
+    <a href="${back}" class="small text-secondary"><i class="fa-solid fa-arrow-left me-1"></i>${editing ? 'Back to patient' : 'All patients'}</a>
+    ${header(editing ? `Edit patient · ${esc(p.name)}` : 'Register new patient')}
+    <form id="reg-form" class="row g-4" novalidate>
+      <div class="col-xl-8">
+        <div class="card p-4 mb-3">
+          ${step(1, 'Patient ID', 'fa-id-card')}
+          <div class="d-flex flex-wrap align-items-center gap-3">
+            <span class="reg-id">${esc(code)}</span>
+            <span class="small text-muted">${editing ? `Registered on ${esc(fmtDate(p.created_at.slice(0, 10)))}`
+              : 'Assigned automatically when you save. Write it on the patient\'s file.'}</span>
+          </div>
+        </div>
+
+        <div class="card p-4 mb-3">
+          ${step(2, 'Patient details', 'fa-user')}
+          <div class="row g-3">
+            <div class="col-12"><label class="form-label">Full name <span class="text-danger">*</span></label>
+              <input name="name" class="form-control form-control-lg" required maxlength="120" value="${esc(p.name)}" placeholder="As on ID proof" autocomplete="off"></div>
+            <div class="col-md-6"><label class="form-label">Date of birth</label>
+              <input name="dob" type="date" class="form-control" max="${localDate()}" value="${esc(p.dob)}">
+              <div class="form-text" id="age-hint">&nbsp;</div></div>
+            <div class="col-md-6"><label class="form-label d-block">Gender</label>
+              <div class="btn-group flex-wrap" role="group">${GENDERS.map((g, i) => `
+                <input type="radio" class="btn-check" name="gender" id="g${i}" value="${g}" ${p.gender === g ? 'checked' : ''}>
+                <label class="btn btn-outline-brand btn-sm" for="g${i}">${g}</label>`).join('')}</div></div>
+            <div class="col-md-6"><label class="form-label">Patient phone <span class="text-danger">*</span></label>
+              <div class="input-group"><span class="input-group-text"><i class="fa-solid fa-mobile-screen"></i></span>
+                <input name="phone" type="tel" class="form-control" required value="${esc(p.phone)}" placeholder="10-digit mobile number"></div></div>
+            <div class="col-md-6"><label class="form-label">Email</label>
+              <div class="input-group"><span class="input-group-text"><i class="fa-regular fa-envelope"></i></span>
+                <input name="email" type="email" class="form-control" value="${esc(p.email)}" placeholder="Optional"></div></div>
+            <div class="col-12"><label class="form-label">Address</label>
+              <textarea name="address" class="form-control" rows="2" maxlength="500" placeholder="House, street, area, city, PIN">${esc(p.address)}</textarea></div>
+          </div>
+        </div>
+
+        <div class="card p-4 mb-3">
+          ${step(3, 'Bystander / attendant', 'fa-people-arrows')}
+          <p class="small text-muted mt-n1">The family member or friend who comes with the patient and can be contacted in an emergency.</p>
+          <div class="row g-3">
+            <div class="col-md-5"><label class="form-label">Bystander name</label>
+              <input name="bystander_name" class="form-control" maxlength="120" value="${esc(p.bystander_name)}"></div>
+            <div class="col-md-3"><label class="form-label">Relationship</label>
+              <select name="bystander_relation" class="form-select"><option value="">—</option>
+                ${RELATIONS.map((r) => `<option ${p.bystander_relation === r ? 'selected' : ''}>${r}</option>`).join('')}</select></div>
+            <div class="col-md-4"><label class="form-label">Bystander phone</label>
+              <div class="input-group"><span class="input-group-text"><i class="fa-solid fa-phone"></i></span>
+                <input name="bystander_phone" type="tel" class="form-control" value="${esc(p.bystander_phone)}"></div></div>
+          </div>
+        </div>
+
+        <div class="card p-4 mb-3">
+          ${step(4, 'Notes', 'fa-note-sticky')}
+          <textarea name="notes" class="form-control" rows="2" maxlength="2000"
+            placeholder="Non-clinical notes for staff, e.g. prefers evening appointments, needs wheelchair access">${esc(p.notes)}</textarea>
+          <div class="form-text">Visible to all staff. Clinical notes go in Session notes on the patient's page.</div>
+        </div>
+
+        <div data-error></div>
+        <div id="dup-box"></div>
+        <div class="d-flex flex-wrap gap-2 justify-content-end mb-4">
+          <a class="btn btn-light" href="${back}">Cancel</a>
+          ${editing ? '' : '<button class="btn btn-outline-brand" type="submit" data-then="book"><i class="fa-regular fa-calendar-plus me-1"></i>Save &amp; book appointment</button>'}
+          <button class="btn btn-brand px-4" type="submit" data-then="open"><i class="fa-solid fa-check me-1"></i>${editing ? 'Save changes' : 'Register patient'}</button>
+        </div>
+      </div>
+
+      <div class="col-xl-4">
+        <div class="sticky-xl-top" style="top: 1rem">
+          <div class="small text-uppercase text-muted mb-2">Patient card preview</div>
+          <div id="card-preview"></div>
+          <div class="small text-muted mt-2">You can print this card from the patient's page after saving.</div>
+        </div>
+      </div>
+    </form>`;
+
+  const form = $('#reg-form');
+  const update = () => {
+    const f = formData(form);
+    $('#card-preview').innerHTML = patientCardHtml(f, code);
+    const age = ageOf(f.dob);
+    $('#age-hint').textContent = age !== null ? `Age: ${age} year${age === 1 ? '' : 's'}` : ' ';
+  };
+  form.addEventListener('input', update);
+  form.addEventListener('change', update);
+  update();
+  if (!editing) form.name.focus();
+
+  async function save(f, then, confirmDuplicate) {
+    const body = { ...f, gender: f.gender || '', confirm_duplicate: confirmDuplicate };
+    let saved;
+    try {
+      saved = editing ? await api('PATCH', `/api/patients/${id}`, body) : await api('POST', '/api/patients', body);
+    } catch (e) {
+      if (e.data?.code !== 'possible_duplicate') throw e;
+      $('#dup-box').innerHTML = `<div class="alert alert-warning">
+        <div class="fw-semibold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i>This phone number is already registered to:</div>
+        <ul class="mb-2">${e.data.matches.map((m) => `<li><a href="#/patient/${m.id}">${esc(m.patient_code)} · ${esc(m.name)}</a></li>`).join('')}</ul>
+        <div class="small mb-2">If this is the same person, open their record instead. If it's a different person who shares the phone
+          (for example a family member), you can continue.</div>
+        <button type="button" class="btn btn-sm btn-warning" id="dup-continue">Yes, ${editing ? 'save' : 'register'} anyway</button></div>`;
+      $('#dup-continue').onclick = () => save(f, then, true).catch((err) => {
+        $('[data-error]', form).innerHTML = `<div class="alert alert-danger py-2">${esc(err.message)}</div>`;
+      });
+      $('#dup-box').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    toast(editing ? 'Patient updated.' : `Patient registered: ${saved.patient.patient_code}`);
+    if (then === 'book') bookAfterOpen = saved.patient.id;
+    location.hash = `#/patient/${saved.patient.id}`;
+  }
+  onSubmit(form, (f, ev) => {
+    $('#dup-box').innerHTML = '';
+    return save(f, ev.submitter?.dataset.then, false);
   });
 }
 
-async function renderPatient(id) {
+async function renderPatient(id, sub) {
+  if (sub === 'edit') return renderPatientForm(id);
   const { patient: p, appointments } = await api('GET', `/api/patients/${id}`);
   const canNotes = isAdmin() || isDoctor();
   const notes = canNotes ? (await api('GET', `/api/patients/${id}/notes`)).notes : [];
-  const age = p.dob ? Math.floor((Date.now() - new Date(`${p.dob}T00:00:00`)) / 3.15576e10) : null;
   const myAppts = appointments.filter((a) => !isDoctor() || a.doctor_id === app.user.doctor_id);
+  const hasBystander = p.bystander_name || p.bystander_phone;
 
   view().innerHTML = `
     <a href="#/patients" class="small text-secondary"><i class="fa-solid fa-arrow-left me-1"></i>All patients</a>
-    ${header(esc(p.name), `<button class="btn btn-outline-secondary" id="edit-pt"><i class="fa-solid fa-pen me-1"></i>Edit</button>
+    ${header(`${esc(p.name)} <span class="badge bg-brand-soft text-brand align-middle fs-6 ms-1">${esc(p.patient_code)}</span>`,
+      `<button class="btn btn-outline-secondary" id="print-pt"><i class="fa-solid fa-print me-1"></i>Print card</button>
+      <a class="btn btn-outline-secondary" href="#/patient/${p.id}/edit"><i class="fa-solid fa-pen me-1"></i>Edit</a>
       <button class="btn btn-brand" id="book-pt"><i class="fa-solid fa-plus me-1"></i>Book appointment</button>`)}
     <div class="row g-4">
       <div class="col-lg-4">
-        <div class="card p-3 mb-4">
+        <div class="mb-3">${patientCardHtml(p, p.patient_code)}</div>
+        <div class="card p-3 mb-3">
+          <div class="d-flex gap-2 mb-3">
+            <a class="btn btn-sm btn-outline-secondary flex-fill" href="tel:${esc(p.phone)}"><i class="fa-solid fa-phone me-1"></i>Call</a>
+            <a class="btn btn-sm btn-success flex-fill" target="_blank" rel="noopener" href="${esc(waLink(p.phone, ''))}"><i class="fa-brands fa-whatsapp me-1"></i>WhatsApp</a>
+          </div>
           <dl class="row small mb-0">
-            <dt class="col-5">Phone</dt><dd class="col-7"><a href="tel:${esc(p.phone)}">${esc(p.phone)}</a></dd>
             <dt class="col-5">Email</dt><dd class="col-7 text-break">${esc(p.email) || '—'}</dd>
-            <dt class="col-5">Date of birth</dt><dd class="col-7">${p.dob ? `${esc(fmtDate(p.dob))} (${age})` : '—'}</dd>
-            <dt class="col-5">Gender</dt><dd class="col-7">${esc(p.gender) || '—'}</dd>
+            <dt class="col-5">Date of birth</dt><dd class="col-7">${p.dob ? `${esc(fmtDate(p.dob))} (${ageOf(p.dob)} yrs)` : '—'}</dd>
             <dt class="col-5">Address</dt><dd class="col-7">${esc(p.address) || '—'}</dd>
-            <dt class="col-5">Emergency</dt><dd class="col-7">${esc(p.emergency_contact) || '—'}</dd>
             <dt class="col-5">Registered</dt><dd class="col-7">${esc(fmtDate(p.created_at.slice(0, 10)))}</dd>
           </dl>
-          ${p.notes ? `<div class="alert alert-light small mt-3 mb-0">${esc(p.notes)}</div>` : ''}
-          ${isAdmin() && !appointments.length ? '<button class="btn btn-sm btn-outline-danger mt-3" id="del-pt">Delete patient</button>' : ''}
         </div>
+        <div class="card p-3 mb-3">
+          <div class="small text-uppercase text-muted mb-2"><i class="fa-solid fa-people-arrows me-1"></i>Bystander / attendant</div>
+          ${hasBystander ? `<div class="fw-semibold">${esc(p.bystander_name) || '—'}${p.bystander_relation ? ` <span class="text-muted fw-normal">(${esc(p.bystander_relation)})</span>` : ''}</div>
+            ${p.bystander_phone ? `<div class="small text-muted mb-2">${esc(p.bystander_phone)}</div>
+            <div class="d-flex gap-2">
+              <a class="btn btn-sm btn-outline-secondary flex-fill" href="tel:${esc(p.bystander_phone)}"><i class="fa-solid fa-phone me-1"></i>Call</a>
+              <a class="btn btn-sm btn-success flex-fill" target="_blank" rel="noopener" href="${esc(waLink(p.bystander_phone, ''))}"><i class="fa-brands fa-whatsapp me-1"></i>WhatsApp</a>
+            </div>` : ''}`
+          : `<div class="small text-muted">Not recorded. <a href="#/patient/${p.id}/edit">Add bystander</a></div>`}
+        </div>
+        ${p.notes ? `<div class="alert alert-light small">${esc(p.notes)}</div>` : ''}
+        ${isAdmin() && !appointments.length ? '<button class="btn btn-sm btn-outline-danger" id="del-pt">Delete patient</button>' : ''}
       </div>
       <div class="col-lg-8">
         <div class="card p-3 mb-4"><h2 class="h5 mb-3">Appointments</h2>
@@ -747,7 +914,11 @@ async function renderPatient(id) {
       </div>
     </div>`;
 
-  $('#edit-pt').onclick = () => patientForm(p);
+  $('#print-pt').onclick = () => printPatientCard(p);
+  if (bookAfterOpen === p.id) {
+    bookAfterOpen = null;
+    newAppointment({ patient: p });
+  }
   $('#book-pt').onclick = () => newAppointment({ patient: p });
   bindAppointmentRows(view());
   const del = $('#del-pt');
@@ -1066,6 +1237,7 @@ async function renderSettings() {
       ${field('clinic_address', 'Address')}
       ${field('currency', 'Currency code (e.g. INR, USD)', 'text', 'maxlength="3"')}
       ${field('phone_country_code', 'Phone country code for WhatsApp (e.g. 91)', 'text', 'maxlength="4"')}
+      ${field('patient_id_prefix', 'Patient ID prefix (e.g. P → P-0001, MC → MC-0001)', 'text', 'maxlength="6"')}
       <div class="col-12 mt-4"><h2 class="h6 text-uppercase text-muted">Online booking</h2></div>
       ${toggle('online_booking_enabled', 'Allow patients to book online')}
       ${toggle('auto_confirm_online', 'Auto-confirm online bookings (otherwise staff confirm them)')}

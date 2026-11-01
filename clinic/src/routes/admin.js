@@ -284,6 +284,10 @@ module.exports = function adminRoutes(db, notifier) {
       throw bad('Country code must be digits only, e.g. 91.');
     }
     if (b.phone_country_code !== undefined) b.phone_country_code = String(b.phone_country_code).replace('+', '');
+    if (b.patient_id_prefix !== undefined) {
+      b.patient_id_prefix = String(b.patient_id_prefix).trim().toUpperCase();
+      if (!/^[A-Z0-9]{0,6}$/.test(b.patient_id_prefix)) throw bad('Patient ID prefix: up to 6 letters or digits, e.g. P or MC.');
+    }
     const set = db.prepare('UPDATE settings SET value = ? WHERE key = ?');
     tx(db, () => {
       for (const key of Object.keys(DEFAULT_SETTINGS)) {

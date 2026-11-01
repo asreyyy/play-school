@@ -4,6 +4,7 @@ const express = require('express');
 const { getSettings } = require('../db');
 const { availableSlots, isValidDate, localDate, addDays } = require('../slots');
 const { createAppointment } = require('../appointments');
+const { createPatient, findByPhoneAndName } = require('../patients');
 const { HttpError, bad, notFound, int, required, str, phone, email, normalizePhone } = require('../util');
 
 const PUBLIC_SETTINGS = [
@@ -84,15 +85,14 @@ module.exports = function publicRoutes(db, notifier) {
       reason,
       source: 'online',
       resolvePatient: () => {
-        const existing = db.prepare('SELECT id, email FROM patients WHERE phone = ?').get(patientPhone);
+        const existing = findByPhoneAndName(db, patientPhone, name);
         if (existing) {
           if (patientEmail && !existing.email) {
             db.prepare('UPDATE patients SET email = ? WHERE id = ?').run(patientEmail, existing.id);
           }
           return existing.id;
         }
-        return db.prepare('INSERT INTO patients (name, phone, email) VALUES (?, ?, ?)')
-          .run(name, patientPhone, patientEmail).lastInsertRowid;
+        return createPatient(db, { name, phone: patientPhone, email: patientEmail });
       },
     });
     notifier.bookingCreated(appt);

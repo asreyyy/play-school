@@ -5,6 +5,7 @@ const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const crypto = require('node:crypto');
 const { hashPassword } = require('./auth');
+const { patientsTable, migratePatients } = require('./patients');
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS settings (
@@ -64,18 +65,7 @@ CREATE TABLE IF NOT EXISTS time_off (
   reason     TEXT NOT NULL DEFAULT ''
 );
 
-CREATE TABLE IF NOT EXISTS patients (
-  id                INTEGER PRIMARY KEY,
-  name              TEXT NOT NULL,
-  phone             TEXT NOT NULL UNIQUE,
-  email             TEXT NOT NULL DEFAULT '',
-  dob               TEXT NOT NULL DEFAULT '',
-  gender            TEXT NOT NULL DEFAULT '',
-  address           TEXT NOT NULL DEFAULT '',
-  emergency_contact TEXT NOT NULL DEFAULT '',
-  notes             TEXT NOT NULL DEFAULT '',
-  created_at        TEXT NOT NULL DEFAULT (datetime('now'))
-);
+${patientsTable('patients')};
 
 CREATE TABLE IF NOT EXISTS appointments (
   id             INTEGER PRIMARY KEY,
@@ -124,6 +114,7 @@ const DEFAULT_SETTINGS = {
   auto_confirm_online: '0',
   online_booking_enabled: '1',
   phone_country_code: '91',
+  patient_id_prefix: 'P',
 };
 
 function openDb(file) {
@@ -159,6 +150,7 @@ function migrate(db) {
   if (!apptCols.includes('meeting_link')) {
     db.exec("ALTER TABLE appointments ADD COLUMN meeting_link TEXT NOT NULL DEFAULT ''");
   }
+  migratePatients(db);
 }
 
 function seed(db) {

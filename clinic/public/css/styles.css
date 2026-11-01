@@ -104,3 +104,43 @@ body {
 .timeline-time { width: 72px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .note-card { white-space: pre-wrap; }
 .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+/* ---------- Patient registration & ID card ---------- */
+.reg-step { display: flex; align-items: center; font-weight: 600; font-size: 1.05rem; margin-bottom: 1rem; }
+.reg-step > span {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--brand); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; margin-right: .6rem;
+}
+.reg-id {
+  font: 700 1.6rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .06em;
+  color: var(--brand-dark); background: var(--brand-soft); border: 2px dashed #b9dbd6; border-radius: 10px; padding: .45rem .9rem;
+}
+.min-w-0 { min-width: 0; }
+
+.patient-card {
+  border-radius: 16px; overflow: hidden; background: #fff; color: var(--ink);
+  box-shadow: 0 8px 24px rgba(20, 60, 60, .15); border: 1px solid #e3eeec;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.patient-card .pc-head {
+  display: flex; justify-content: space-between; align-items: center; gap: .5rem;
+  background: linear-gradient(135deg, var(--brand) 0%, #3f9a8f 100%); color: #fff; padding: .7rem 1rem; font-weight: 600; font-size: .9rem;
+}
+.patient-card .pc-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: rgba(255, 255, 255, .2); padding: .1rem .5rem; border-radius: 6px; letter-spacing: .05em; }
+.patient-card .pc-body { display: flex; gap: .9rem; align-items: center; padding: 1rem; }
+.patient-card .pc-avatar {
+  flex: 0 0 56px; width: 56px; height: 56px; border-radius: 50%; background: var(--brand-soft); color: var(--brand);
+  display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.2rem;
+}
+.patient-card .pc-name { font-weight: 700; font-size: 1.15rem; overflow-wrap: anywhere; }
+.patient-card .pc-meta { color: var(--muted); font-size: .85rem; }
+.patient-card .pc-foot { background: #f4f8f7; border-top: 1px solid #e3eeec; padding: .6rem 1rem; font-size: .85rem; }
+.patient-card .pc-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+
+#print-area { display: none; }
+@media print {
+  body > *:not(#print-area) { display: none !important; }
+  body { background: #fff; }
+  #print-area { display: block; }
+  #print-area .patient-card { width: 90mm; box-shadow: none; border: 1px solid #ccc; font-size: 10pt; }
+}

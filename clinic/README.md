@@ -48,7 +48,8 @@ It also creates 3 placeholder doctors (Mon–Fri 10:00–13:00 and 14:00–18:00
 - **Online booking**: shows only real free slots, based on each doctor's weekly hours and leave, the service length, existing bookings, minimum notice and how far ahead booking is allowed. Bookings can arrive as *pending* for staff to confirm, or be auto-confirmed (Settings).
 - **No double booking**: overlaps are blocked on the server. Staff can book outside working hours after a confirmation prompt.
 - **Day view**: one column per doctor for a chosen day.
-- **Patient records**: contact details, emergency contact, visit history, and private session notes linked to visits.
+- **Patient registration**: automatic patient ID (e.g. `P-0001`, prefix configurable), name, date of birth with age, gender, phone, address, and a **bystander / attendant** (name, relationship, phone). A live **patient card** preview can be printed. Family members may share a phone number; the app asks you to confirm instead of blocking.
+- **Patient records**: visit history, call/WhatsApp buttons for patient and bystander, and private session notes linked to visits. Search by ID, name, phone or bystander.
 - **Working hours & leave**: multiple blocks per day (for lunch breaks). Adding leave warns you about appointments that clash with it.
 - **Reports**: appointments, completions, no-shows, cancellations, money collected and money outstanding, broken down by doctor and by service for any date range.
 - **Reminders**: one-tap WhatsApp reminders (pre-written message, including the video link for online sessions), and a "Tomorrow" list on the dashboard.

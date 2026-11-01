@@ -2,14 +2,13 @@
 
 const express = require('express');
 const { requireAuth } = require('../auth');
-const { getSettings } = require('../db');
+const { tx, getSettings } = require('../db');
 const { availableSlots, isValidDate, localDate, addDays } = require('../slots');
 const {
   APPOINTMENT_SELECT, STATUSES, getAppointment, createAppointment, updateAppointment,
 } = require('../appointments');
-const {
-  bad, notFound, forbidden, int, str, required, phone, email, updateSet, insertRow,
-} = require('../util');
+const { HttpError, bad, notFound, forbidden, int, str, required, phone, email, updateSet } = require('../util');
+const { peekCode, createPatient, findByPhoneAndName } = require('../patients');
 
 const PATIENT_FIELDS = {
   name: (v) => required(v, 'Name', 120),
@@ -22,7 +21,9 @@ const PATIENT_FIELDS = {
   },
   gender: (v) => str(v, 'Gender', 30),
   address: (v) => str(v, 'Address', 500),
-  emergency_contact: (v) => str(v, 'Emergency contact', 200),
+  bystander_name: (v) => str(v, 'Bystander name', 120),
+  bystander_relation: (v) => str(v, 'Relationship', 40),
+  bystander_phone: (v) => (str(v, 'Bystander phone', 30) ? phone(v) : ''),
   notes: (v) => str(v, 'Notes', 2000),
 };
 
@@ -53,9 +54,15 @@ module.exports = function staffRoutes(db, notifier) {
     if (!seen) throw forbidden();
   }
 
-  function existingPatientConflict(phoneNo, exceptId = 0) {
-    const p = db.prepare('SELECT id, name FROM patients WHERE phone = ? AND id != ?').get(phoneNo, exceptId);
-    if (p) throw bad(`A patient with this phone number already exists (${p.name}).`, { patient_id: p.id });
+  /** Phones can be shared by family members, so other patients on the same phone only need confirming. */
+  function warnSamePhone(phoneNo, exceptId, confirmed) {
+    if (confirmed) return;
+    const matches = db.prepare('SELECT id, patient_code, name FROM patients WHERE phone = ? AND id != ? ORDER BY id LIMIT 5')
+      .all(phoneNo, exceptId);
+    if (matches.length) {
+      throw new HttpError(409, 'Another patient is already registered with this phone number.',
+        { code: 'possible_duplicate', matches });
+    }
   }
 
   // ---------- Dashboard ----------
@@ -136,9 +143,8 @@ module.exports = function staffRoutes(db, notifier) {
     } else {
       const fields = patientFields(b.patient || {}, { partial: false });
       resolvePatient = () => {
-        const existing = db.prepare('SELECT id FROM patients WHERE phone = ?').get(fields.phone);
-        if (existing) return existing.id;
-        return insertRow(db, 'patients', fields);
+        const existing = findByPhoneAndName(db, fields.phone, fields.name);
+        return existing ? existing.id : createPatient(db, fields);
       };
     }
 
@@ -191,8 +197,9 @@ module.exports = function staffRoutes(db, notifier) {
     const args = [];
     if (req.query.q) {
       const like = `%${String(req.query.q).trim()}%`;
-      where.push('(p.name LIKE ? OR p.phone LIKE ? OR p.email LIKE ?)');
-      args.push(like, like, like);
+      where.push(`(p.name LIKE ? OR p.phone LIKE ? OR p.email LIKE ? OR p.patient_code LIKE ?
+                   OR p.bystander_name LIKE ? OR p.bystander_phone LIKE ?)`);
+      args.push(like, like, like, like, like, like);
     }
     if (isDoctor(req.user)) {
       where.push(`p.id IN (SELECT patient_id FROM appointments WHERE doctor_id = ?
@@ -210,6 +217,8 @@ module.exports = function staffRoutes(db, notifier) {
     res.json({ patients: rows });
   });
 
+  r.get('/patients/next-id', (_req, res) => res.json({ patient_code: peekCode(db) }));
+
   r.get('/patients/:id', (req, res) => {
     const id = int(req.params.id, 'Patient');
     const patient = db.prepare('SELECT * FROM patients WHERE id = ?').get(id);
@@ -223,8 +232,8 @@ module.exports = function staffRoutes(db, notifier) {
 
   r.post('/patients', (req, res) => {
     const fields = patientFields(req.body || {}, { partial: false });
-    existingPatientConflict(fields.phone);
-    const id = insertRow(db, 'patients', fields);
+    warnSamePhone(fields.phone, 0, req.body.confirm_duplicate === true);
+    const id = tx(db, () => createPatient(db, fields));
     res.status(201).json({ patient: db.prepare('SELECT * FROM patients WHERE id = ?').get(id) });
   });
 
@@ -233,7 +242,10 @@ module.exports = function staffRoutes(db, notifier) {
     if (!db.prepare('SELECT 1 FROM patients WHERE id = ?').get(id)) throw notFound('Patient');
     assertCanSeePatient(req.user, id);
     const fields = patientFields(req.body || {}, { partial: true });
-    if (fields.phone) existingPatientConflict(fields.phone, id);
+    if (fields.phone) {
+      const current = db.prepare('SELECT phone FROM patients WHERE id = ?').get(id).phone;
+      if (fields.phone !== current) warnSamePhone(fields.phone, id, req.body.confirm_duplicate === true);
+    }
     if (Object.keys(fields).length) {
       const { sql, values } = updateSet(fields);
       db.prepare(`UPDATE patients SET ${sql} WHERE id = ?`).run(...values, id);
